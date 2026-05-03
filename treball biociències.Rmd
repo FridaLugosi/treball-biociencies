@@ -1,0 +1,349 @@
+---
+title: "Treball Bio"
+author: "Iris Arevalo, Vinyet Hernan, Ernest Juncosa, Dongjun Li i Frida Lugosi"
+date: "2026-05-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(ggplot2)
+library(factoextra)
+library(pheatmap)
+library(caret)
+library(pROC)
+```
+
+
+# INTRODUCCIÓ i OBJECTIUS
+
+El treball que hem escollit consisteix en un anàlisi d'un subconjunt de dades òmiques generades pel TCGA corresponent a 150 mostres de tumors de mama prèviament normalitzades i filtrades. La primera columna del conjunt de dades indica el subtipus tumoral, mentre que la resta de columnes corresponen a l'expressió normalitzada de gens seleccionats. El treball és sobre el càncer de mama, que és una malaltia altament heterogènia que presenta diferents subtipus moleculars amb característiques biològiques i clíniques diferenciades. Entre aquests subtipus, n'hi ha tres que són altament rellevants (Basal, Her2 i LumA) que són especialment rellevants per la seva implicació en el pronòstic i en la resposta a l'hora d'escollir i dur a terme els tractaments. L'anàlisi de dades transcriptòmiques mitjançant RNA-Seq permetrà estudiar els nivells d'expressió gènica i identificar patrons moleculars capaços de discriminar entre aquests subtipus tumorals. Aquest tipus d’anàlisi és especialment útil en medicina de precisió, ja que facilita una millor classificció dels pacients i pot contribuir a una presa de decisions terapèutiques més adequada.
+
+A partir d'aquestes dades, aplicarem diferents algoritmes de classificació supervisada, concretament k-NN i SVM amb l'objectiu d'identificar quin model presenta un millor rendiment predictiu.
+
+L'objectiu principal del treball és desenvolupar i comparar diferents models de classificació supervisada per discriminar els subtipus de càncer de mama. 
+
+# MATERIALS i MÈTODES
+
+## IMPORTACIÓ i ANÀLISI EXPLORATORI DE LES DADES
+
+```{r}
+dades <- read.csv("rna.csv")
+```
+
+```{r}
+head(dades)
+dim(dades)
+str(dades)
+sum(is.na(dades))
+```
+
+El primer que hem de veure és que tenim una taula 150x201, cosa que significa que tenim més variables que observacions. 
+Una altra cosa que cal observar és que la variable Y (variable que indica el subtipus de càncer de mama) és una variable de caràcters que haurem de passar a factor, ja que els algoritmes de classificació supervisada requereixen que la variable depenent sigui categòrica. La resta de variables, evidentment, són numèriques.
+
+```{r}
+dades$Y <- as.factor(dades$Y)
+table(dades$Y)
+```
+
+Una dada important a conèixer de les dades és quina és la distribució dels subtipus tumorals. Aquesta distribució mostra un cert desequilibri entre classes, especialment pel major nombre de mostres del subtipus LumA respecte a Her2, fet que haurem de tenir sempre en compte durant l'avaluació dels models de classificació.
+
+Per aprofundir una mica més en l'avaluació de les dades que tenim, hem considerat convenient fer algunes tècniques per controlar la qualitat de les dades.
+
+### BOXPLOTS
+
+Primer de tot, hem considerat que per saber una mica quins podrien ser els gens més rellevants per a aquest estudi, podem fer un diagrama de caixes dels gens amb major variància
+
+```{r}
+#Selecció dels gens amb més variància
+variancies <- apply(dades[,-1], 2, var)
+top_genes <- names(sort(variancies, decreasing = TRUE))[1:5]
+top_genes
+```
+
+Primer de tot, per entendre bé biològicament els resultats, proporcionarem informació sobre aquests 5 gens:
+
+- STC2: Aquest gen codifica una glicoproteïna homodimèrica secretada que s'expressa en una gran varietat de teixits i pot tenir funcions autocrines o paracrines. La proteïna codificada té 10 dels seus 15 residus de cisteïna conservats entre els membres de la família de la estanniocalcina i és fosforilada per la caseïna cinasa 2 exclusivament en els seus residus de serina. 
+
+- APOD: Glicoproteïna que pertany a la família de les lipocalines. El gen que la codifica està situat a la regió p14.2 del cromosoma 3. Està demostrat que els nivells augmenten en les cèl·lules del cervell durant el procés d'envelliment i també en moltes malalties neurològiques i psiquiàtriques com l'esquizofrènia, el trastorn bipolar, l'alzheimer, el parkinson i la malaltia de Niemann-Pick.
+
+- NTN4: Aquest gen codifica un membre de la família netrina, unes proteïnes relacionades amb la laminina que actuen en el guiatge axonal, la tumorogènesi i l'angiogènesi. Aquest gen en concret destaca per facilitar el creixement de neurites, la migració cel·lular i l'adhesió de cèl·lules murals als vasos sanguinis i és crucial per al desenvolupament del sistema nerviós, la formació de nous vasos sanguinis i l'estabilitat vascular.
+
+- MEX3A: La proteïna MEX3A és molt important ja que regula les cèl·lules mare neurals que permeten crear noves neurones durant l'etapa adulta. És una proteïna d'unió a l'ARN, cosa que vol dir que no canvia els gens, sinó que controla com es llegeixen i es tradueixen les instruccions per fabricar altres proteïnes. A més a més, com que el cervell humà té un nombre limitat de cèl·lules mare, s'encarrega que aquestes cèl·lules no es gastin totes de cop, mantenint un equilibri entre les que estan adormides i les que s'activen
+
+- SEMA3C: Aquest gen codifica una glicoproteïna secretada que pertany a la família de senyals de guia neuronal semaforina de classe 3. Un augment de l'expressió d'aquest gen es correlaciona amb un increment en la invasió i l'adhesió de cèl·lules canceroses. A més a més, les mutacions d'origen natural en aquest gen s'associen amb la malaltia de Hirschsprung (trastorn genètic que causa obstruccions intestinals greus des del naixement)
+
+```{r}
+boxplot(dades$STC2 ~ dades$Y)
+```
+
+El boxplot amb el gen STC2 suggereix que té més expressió amb el subtipus tumoral LumA. En els altres dos subtipus tumorals, veiem punts que són outliers, en el cas de Her2, veiem dos outliers per sobre i en el cas Basal, veiem dos outliers inferiors.
+
+```{r}
+boxplot(dades$APOD ~ dades$Y)
+```
+
+En el boxplot amb el gen APOD, veiem que amb el subtipus Basal el gen té menys expressió gènica que amb els altres dos subtipus tumorals, amb l'excepció d'un outlier que està per sobre els nivells esperats de Her2 i LumA.
+
+```{r}
+boxplot(dades$NTN4 ~ dades$Y)
+```
+
+El boxplot amb el gen NTN4, veiem que Basal torna a ser el subtipus tumoral en el que veiem menys expressió gènica i LumA té més expressió gènica en comparació amb els altres dos subtipus.
+
+```{r}
+boxplot(dades$MEX3A ~ dades$Y)
+```
+
+El gen MEX3A és al revés que el gen NTN4 i el subtipus tumoral amb més expressió gènica és el Basal. A més a més, ens podem adonar que té molta menys variabilitat. LumA és el subtipus amb menys expressió gènica en aquest cas. 
+
+```{r}
+boxplot(dades$SEMA3C ~ dades$Y)
+```
+
+El gen SEMA3C és un gen amb molta expressió gènica i Basal és el subtipus tumoral amb menys expressió gènica i Her2 i LumA tenen expressions gèniques similars tot i que l'expressió gènica de LumA és una mica superior a la de Her2.
+
+### PCA
+
+Una tècnica fonamental en l'anàlisi exploratori de les dades òmiques és fer PCA sobre totes les variables predictores. És una tècnica molt útil per reduir la dimensionalitat del conjunt de dades i ens permet visualitzar possibles patrons de separació entre classes. Bàsicament, és una tècnica consistent en transformar les variables originals en un conjunt reduït de components ortogonals que expliquen la major part de la variabilitat total del conjunt de dades. Aquesta tècnica permet una representació visual més senzilla i facilita la identificació de possibles agrupacions naturals entre mostres. 
+
+```{r}
+pca <- prcomp(dades[,-1], scale. = TRUE)
+#library(factoextra)
+fviz_pca_ind(pca, col.ind = dades$Y, palette = c("blue","springgreen","purple"))
+```
+
+Observem que hi ha diferències entre els tres subtipus en les dues primeres dimensions. Tal i com indica els eixos del gràfic, la dimensió 1 explica el 18,9% de la variabilitat i la dimensió 2 expica el 13,1% de la variabilitat. Clarament, el gràfic mostra una separació entre els subtipus tumorals. Sobretot, veiem diferències a la dimensió 1, ja que a la dimensió 2 estan completament disperses. A l'esquerra de l'eix Y = 0, veiem el gen LumA, al centre el gen Her2 que és el gen, que a simple vista, sembla que té més dispersió. A la dreta de l'eix Y = 0, hi ha el gen Basal.
+
+### HEATMAP
+
+```{r}
+pheatmap(dades[, top_genes])
+```
+
+En aquest mapa de calor, veiem que hi ha algunes mostres on el gen STC2 està molt més expressat. Després, també podem veure diferències per gens, gens que en algunes mostres s'expressen molt sembla provocar que un altre gen s'expressi menys, com per exemple en el cas de les mostres on STC2 té més expressió, MEX3A en té molta menys. 
+
+## SEPARACIÓ TRAIN/TEST
+
+Per garantir la comparabilitat entre models, tots els algoritmes els entrenem i avaluarem utilitzant exactament la mateixa partició de train i test. Seguint les indicacions de l'enunciat, utilitzarem una llavor fixa per garantir la reproductibilitat dels resultats. 
+
+```{r}
+set.seed(213)
+
+n <- nrow(dades)
+train_idx <- sample(1:n,size=round(0.67 * n))
+
+data.train <- dades[train_idx,]
+data.test <- dades[-train_idx,]
+```
+
+
+# RESULTATS
+
+Per evitar que l'algoritme memoritzi les dades i creii un sobreajust, farem servir cross-validation de 3 folds. Això vol dir que les dades estaràn dividides en 3 parts diferents (*tal i com es pot observar en el chunk anterior*): 2 les farem servir per a entrenar el model i següdament amb la 3 era part de les dades es valida. Repetirem el procés  per assegurar que el model serà robust davant de dades noves. 
+
+
+## 1. Classificació amb k-Nearest Neighbour
+El mètode de **K-Nearest Neighbour (KNN)** consisteix en crear una nova mostra per a observar la classe pertinent de les mostres veïnes; és a dir, aquelles que són més properes a ella en l'espei de dades. 
+
+Amb la següent funció utilitzarem aquest mètode, calcularem la distància euclidiana (*que és la típica en aquest cas*)d'un punt cap als seus "k" veïns més propers a partir dels nivells d'expressió dels gens (que actuen en aquest cas com variables predictores). Finalment assignarem la classe majoritària entre els k veïns a la nova mostra.  
+
+Tal i com s'ha explicat abans; farem servir el cross-validation de 3 folds. Explorarem els valors k = 1, 3, 5, 7, 11 per trobar el nombre òptim de veïns per aquest conjunt de dades.  
+ 
+```{r}
+library(caret)
+
+# mètode d'entrenament del 3-fold cv (validació creuada)
+ctrl <- trainControl(method = "cv", number = 3)
+
+valors_k <- expand.grid(k = c(1, 3, 5, 7, 11))
+```
+
+Ara entrenem el model KNN usant la variable Y com a resposta i tota la resta com a predictors. Hem estandaritzat les dades perquè KNN es basa en distàncies i sabem que és molt sensible a l'escala de les pròpies dades per a calcular-les.  
+
+```{r}
+set.seed(123)
+model_knn <- train(Y ~ ., 
+                   data = data.train, 
+                   method = "knn", 
+                   trControl = ctrl, 
+                   tuneGrid = valors_k,
+                   preProcess = c("center", "scale"))
+
+print(model_knn)
+```
+En els resultats obtinguts en aquesta taula s'observa que s'han utilitzat 100 mostres per a l'entrenament (són el 2/3 de les 150 que hi han) juntament amb els 200 predictors que hi han (nivells d'expressió dels gens). 
+
+Aquesta explica que els grups de validació (3 fold) han tingut mides de 66, 68 i 66 mostres. 
+
+Al tindre classes desequilibrades, s'utilitza la mètrica de Kappa ja que aquesta medeix la concordança entre les prediccions del model i de la realitat. La columna d'accurancy explica quanr encerta el model de les classificacions durant la validació creuada. 
+
+S'observa que els valors més grans de kappa (0.8336145) i accurancy (0.9013480) estàn amb la k=3, per lo tant podem concluir que amb el valor òptim de k que és 3, el model knn està molt ben ajustat. 
+
+
+A l'assignatura d'anàlisi multivariant hem estudiat com es representa gràficaemnt la validació d'aquest mètode: 
+
+```{r}
+plot(model_knn, main = "Optimització de K", 
+     pch = 19, col = "steelblue")
+```
+S'observa que el punt més alt de la corba es troba en k=3, aquest confirma que amb tres veïns el model assoleix el seu màxim rendiment abans de començar a decaure (ja sigui per excés de soroll o per suavitzar massa les dades). 
+
+
+És interessant estudiar també que a partir de projectar les dades (les de test) en un pla (l'he creat a partir dels dos gens més variables), podem veure com ha classificat les el mètode de KNN les noves mostres. 
+
+Per projectar les dades en 2D, hem escollit els gens STC2 i APOD atès que, com s'ha vist a l'anàlisi exploratori prèvi, són els que presenten la variància més alta. 
+
+
+```{r}
+# trio els 2 gens
+gen1 <- "STC2"
+gen2 <- "APOD"
+
+resultats_vis <- data.frame(
+  G1 = data.test[, gen1],
+  G2 = data.test[, gen2],
+  Real = data.test$Y,
+  Prediccio = prediccions_knn
+)
+
+# on s'ha equivocat el model
+resultats_vis$Correcte <- ifelse(resultats_vis$Real == resultats_vis$Prediccio, "Sí", "No")
+
+ggplot(resultats_vis, aes(x = G1, y = G2, color = Prediccio, shape = Correcte)) +
+  geom_point(size = 3, alpha = 0.8) +
+  scale_shape_manual(values = c("Sí" = 19, "No" = 4)) +
+  labs(title = "prediccions a partir de KNN amb k=3 (en test)",
+       subtitle = paste("Variables:", gen1, "vs", gen2),
+       x = paste("Expressió", gen1),
+       y = paste("Expressió", gen2),
+       shape = "Classificació Correcta?") +
+  theme_minimal()
+```
+
+Aquest gràfic format per l'expressió del gen STC2 en l'eix x i el gen APOD en l'eix y, representa per colors a quina classe de subtipus de càncer pertany cada mostra (basant-nos en els 3 veïns més propers de les dades d'entrenament). 
+El rosa és de subtipus Basal, tendeix a agrupar-se en la part esquerra (valors més baixos de STC2). El verd representa Her2 i, el blau LumA que es troben en la part dreta de STC2. 
+
+La gran majoria de elements que hi ha en el gràfic són cercles, fet que reflecteix que és un model amb molts encerts amb la realitat. Les poques creus que hi han es troben en les fronteres de decisió, així que és normal que en aquelles zones el model falli ocasionalment. 
+
+Per a una millor explicació, representarem ara el mateix gràfic, però amb les diferentes k's. 
+
+```{r}
+library(gridExtra)
+
+gen1 <- "STC2"
+gen2 <- "APOD"
+
+# valors de k per a comparar
+k_valors <- c(1, 5, 7, 11)
+
+llista_grafics <- list()
+
+for(i in seq_along(k_valors)) {
+  k_actual <- k_valors[i]
+
+  set.seed(123)
+  model_temp <- train(Y ~ ., 
+                      data = data.train, 
+                      method = "knn", 
+                      tuneGrid = data.frame(k = k_actual),
+                      preProcess = c("center", "scale"),
+                      trControl = trainControl(method = "none")) 
+  
+  pred_temp <- predict(model_temp, newdata = data.test)
+  
+  res_temp <- data.frame(
+    G1 = data.test[, gen1],
+    G2 = data.test[, gen2],
+    Real = data.test$Y,
+    Prediccio = pred_temp
+  )
+  res_temp$Correcte <- ifelse(res_temp$Real == res_temp$Prediccio, "Sí", "No")
+  
+  p <- ggplot(res_temp, aes(x = G1, y = G2, color = Prediccio, shape = Correcte)) +
+    geom_point(size = 2, alpha = 0.8) +
+    scale_shape_manual(values = c("Sí" = 19, "No" = 4)) +
+    labs(title = paste("k =", k_actual),
+         x = gen1, y = gen2) +
+    theme_minimal() +
+    theme(legend.position = "none", 
+          plot.title = element_text(size = 10, face = "bold"))
+  
+  llista_grafics[[i]] <- p
+}
+
+grid.arrange(grobs = llista_grafics, ncol = 2, 
+             top = "Comparació del test segons les diferentes K's")
+```
+El fet de que hi hagin més creus en aquests 4 gràfics en comparació amb l'anterior indica que hi han més errors de classificació (el model tendeix a euivocar-se més que no pas amb la k òptima).
+
+Troben que amb el k=1, fa que el model sigui més sensible als outliers de l'entrenament i, en canvi, amb els k=5,7,11 fa que es torni massa conservador a causa d'un sobreajust. 
+
+Amb aquestes evidències visuals, queda clar que k=3 és un equilibri ideal entre precisió i capacitat de generalització per a aquestes dades òmiques. 
+
+
+
+# DISCUSSIÓ
+
+################################################## 
+
+# Missatge per a la Frida de part de la Iris: 
+**Com ja he fet KNN, he decidit fer com una secció per a la discussió dels resultats, quan tinguis tu la teva part feta; la posem en comú i trobem finalment quin és el millor. Per a no oblidar els resultats i la part de discussió meva; la posaré aquí**
+
+En el mètode de KNN, que es basa en la proximitat de l'expressió gènica entre mostres, hem obserat que et fet de tindre una base de addes gran (amnb 200 gens), la qualitat del knn depèn de la mètrica de distància. Per a això abans de realitar aquest mètode s'ha hagut d'estandarditzar. S'ha escollit el model amb k=3 perquè era el que presentava els valors més alts d'accurancy i Kappa, per lo tant, representa el model amb major capacitat predictiva i concordança que no es deu al atzar. 
+
+*El següent pas serà contrastar l'eficiència i capacitat separadora d'aquests mateixos gens mitjançant fronteres lineals i radials complexes (SVM) per veure quin enfocament captura millor la base biològica del problema.* -- te toca Friday :)
+
+
+#################################################
+
+
+
+
+
+
+
+
+
+
+
+######################################################
+
+# Missatge per a la Dongjun de part de la Iris
+
+MATRIU DE CONFUSIÓ (part de la Dongjun)
+**Bueno, pensava que tmb havia de fer la matriu de confusió de knn, pero vamos creo que no. Així que Dongjun et deixo aquest script (ns si el necessitaràs per a fer la teva part o no; pero eso)**
+- Iris :))
+```{r}
+prediccions_knn <- predict(model_knn, newdata = data.test)
+
+# Calculem la matriu de confusió i les mètriques de qualitat
+matriu_conf_knn <- confusionMatrix(prediccions_knn, data.test$Y)
+matriu_conf_knn
+```
+
+
+
+##########################################################
+
+
+
+
+
+
+
+
+
+
+
+
+# REFERÈNCIES
+
+- Wikipedia STC2
+- Wikipedia APOD
+- https://portal.gdc.cancer.gov/genes/ENSG00000074527
+- https://sebbm.es/revista/investigacion/mex3a-una-proteina-necesaria-para-mantener-el-reservorio-de-celulas-madre/
+- https://www.ncbi.nlm.nih.gov/gene/10512 
