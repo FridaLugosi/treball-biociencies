@@ -300,6 +300,90 @@ En el mètode de KNN, que es basa en la proximitat de l'expressió gènica entre
 
 #################################################
 
+## SVM
+Primer de tot s'indica que es vol entrenar el model amb 3 fold-cross validation, això es fa indicant el mètode "cv" (cross-validation) i com que es volen 3 folds, number 3. Amb els folds el que es consegueix és dividir les dades en 3 parts iguals on es fan tres iteracions. S'entrena amb dos folds i es valida amb el que resta. Amb aquest mètode s'utilitzen millor les dades ja que, com que es tenen molts gens en el data-set no es pot permetre perdre dades.
+
+```{r}
+control <- trainControl(method = "cv", number = 3)
+```
+
+Un cop definit la manera d'entrenar el model, s'aplica aquest.
+Es començarà a aplicar el SVM, aquest algorisme busca separar classes amb un hiperplà óptim, en el cas d'aquest treball, es busca distingir els diferents tipus de mostres biològiques.
+
+Lo bo d'aquest algorsime és que segueix sent efectiu en els casos on p>n.
+
+Com que l’objectiu d’aquest algorisme és separar les classes mitjançant una frontera de decisió lineal, en el cas de dades en més de dues dimensions, osigui aquest treball en particular, `ncol(dades)=201`, el conjunt té 200 predictors, ja que la columna Y és la variable resposta i no compta com a predictor, i per tant aquesta frontera és un hiperplà. I per això no sempre és possible separar les classes de manera lineal. Per això, s’utilitzen les funcions kernel, que permeten transformar les dades a un espai de major dimensió on poden ser separades linealment.
+
+En primer lloc, s’explora el kernel lineal, que no aplica cap transformació i genera fronteres de decisió lineals.
+
+*Kernel lineal*
+S'entrena el model amb la formula del model, utilitzant totes les variables, s'utilitzen les dades que han sigut expressament separades per entrenar el model amb el tractament de control `trControl` establert abans (3 fold-cross validation). S'aplica `svmLinear` com s'ha comentat anteriorment. És important escalar les variables en l'algorisme SVM, i per tant es fa un preprocessament `preProcess` on es centren i s'escalen. I finalment, es defineixen els valors dels paràmetres de l'hiperplà `tuneGrid=expand.grid()` on es van provant diferents valors fins trobar l'adequat.
+```{r}
+set.seed(123)
+
+modelo_svm_lineal <- train(
+  Y ~ .,
+  data = data.train,
+  method = "svmLinear",
+  trControl = control,
+  preProcess = c("center", "scale"),
+  tuneGrid = expand.grid(
+    C = 2^(-5:10)
+  )
+)
+```
+S'observa que per tots els valors de C tenen la "accuracy" amb el mateix valor i que per tant es té un model molt estable i fàcilment separable linealment. Finalment es mostra que el valor ideal de C és 0.03125, el qual és el més petit, ja que el model simple ja funciona perfectament.
+
+
+Un cop el model està definit es prediuen les dades amb les que s'han separat expressament per testejar. I s'evaluen els resultats de la predicció amb la matriu de confusió. Aquesta el que fa és calcular la precisió, exactitud...
+
+```{r}
+pred_lineal <- predict(modelo_svm_lineal, data.test)
+
+confusionMatrix(pred_lineal, data.test$Y)
+```
+La matriu de confusió retorna una accuracy del 0.94 i un kappa, que és l'ajust per atzar, del 0.9, aquests valors són molt bons.
+Pel que fa a les classes, el model classifica perfectament la classe LumA, mentre que es detecten petites confusions entre les classes Basal i Her2 que es poden observar en les prediccions. En la matriu de confusió es recalquen aquests petits errors en les columnes de `sensitivity` i `specificity.` A les altres columnes com `prevalence`, `detection prevalence` es pot veure que en la categoria basal el model infraprediu, en Her2 el model sobreprediu i LumA està ben ajustat
+
+En conclusió, el model amb la funció kernel lineal està molt ben ajustat, igualment, es provarà amb la funció kernel rbf ja que aquest pot millorar o sobreajustar.
+
+*Kernel rbf*
+
+De forma similar al lineal, s'usen totes les variables regressores, s'utilitzen les dades separades per entrenar amb el tractament especificat al principi, s'escalen les dades com a preprocessament. El que canvia en aquest model és el mètode `svmRadial` i que en aquest es tenen dos paràmetres a ajustar, aquests són el `C` (que també estava en el model lineal) que és quant castigues equivocar-se, i `Sigma` que signfica com de recargolada pot ser la frontera que es crea. Per establir aquests paràmetres es fa una graella i prova amb els diferents.
+
+```{r}
+set.seed(123)
+
+grid_rbf <- expand.grid(
+  C = 2^(-5:10),
+  sigma = 2^(-10:2)
+)
+
+modelo_svm_rbf <- train(
+  Y ~ .,
+  data = data.train,
+  method = "svmRadial",
+  trControl = control,
+  preProcess = c("center", "scale"),
+  tuneGrid = grid_rbf
+)
+```
+A partir dels resultats del model mostra que ,moltes combinacions de C i sigma donen una accuracy propera a 0.52 i un Kappa igual a 0, indicant que el model és molt sensible a aquests paràmetres. Els quals són valors molt més petits que el lineal. Però es troba que la millor combinació és sigma 0.0009765625 i c=4 amb 94.06% d'accuracy i un Kappa de 0.90, que és un rendiment molt alt.
+
+```{r}
+pred_rbf <- predict(modelo_svm_rbf, data.test)
+
+confusionMatrix(pred_rbf, data.test$Y)
+```
+
+Les mètriques de qualitat mostren que el model presenta un rendiment molt elevat, amb una accuracy del 94% i un valor de Kappa de 0.90, indicant una classificació excel·lent. El model és significativament millor que un classificador aleatori (NIR = 0.46). Pel que fa a les classes, LumA es classifica perfectament, mentre que les petites confusions es concentren entre Basal i Her2. Les mètriques de sensibilitat, especificitat i balanced accuracy confirmen la robustesa del model. Més específicament matriu de confusió retorna que classifica perfectament les mostres LumA i també molt bé la Basal. La classe més problemàtica segueix sent Her2. Hi ha 2 mostres problemàtiques a Basal classificades com a Her2 i 1 mostra Her2 classificada com a LumA.
+
+```{r}
+plot(modelo_svm_lineal)
+plot(modelo_svm_rbf)
+```
+Encara que, RBF és més flexible, no millora el rendiment respecte el model lineal. RBF no empitjora sino que no aporta cap millora. Llavors pel principi de parsimonia s'escull el model més simple, per tant, el lineal. Cal destacar que el model lineal és molt constant i per tant funciona bé sempre i que el RBF només funciona bé en una zona concreta.
+En aquests últims gràfics es pot veure clarament la inconsistència del RBF, el que es comentava anteriorment, que és consistent únicament en una zona.
 
 
 
