@@ -20,9 +20,9 @@ library(pROC)
 
 # INTRODUCCIÓ i OBJECTIUS
 
-El treball que hem escollit consisteix en un anàlisi d'un subconjunt de dades òmiques generades pel TCGA corresponent a 150 mostres de tumors de mama prèviament normalitzades i filtrades. La primera columna del conjunt de dades indica el subtipus tumoral, mentre que la resta de columnes corresponen a l'expressió normalitzada de gens seleccionats. El treball és sobre el càncer de mama, que és una malaltia altament heterogènia que presenta diferents subtipus moleculars amb característiques biològiques i clíniques diferenciades. Entre aquests subtipus, n'hi ha tres que són altament rellevants (Basal, Her2 i LumA) que són especialment rellevants per la seva implicació en el pronòstic i en la resposta a l'hora d'escollir i dur a terme els tractaments. L'anàlisi de dades transcriptòmiques mitjançant RNA-Seq permetrà estudiar els nivells d'expressió gènica i identificar patrons moleculars capaços de discriminar entre aquests subtipus tumorals. Aquest tipus d’anàlisi és especialment útil en medicina de precisió, ja que facilita una millor classificció dels pacients i pot contribuir a una presa de decisions terapèutiques més adequada.
+El treball que s'ha escollit consisteix en un anàlisi d'un subconjunt de dades òmiques generades pel TCGA corresponent a 150 mostres de tumors de mama prèviament normalitzades i filtrades. La primera columna del conjunt de dades indica el subtipus tumoral, mentre que la resta de columnes corresponen a l'expressió normalitzada de gens seleccionats. El treball és sobre el càncer de mama, que és una malaltia altament heterogènia que presenta diferents subtipus moleculars amb característiques biològiques i clíniques diferenciades. Entre aquests subtipus, n'hi ha tres que són altament rellevants (Basal, Her2 i LumA). Són especialment rellevants per la seva implicació en el pronòstic i en la resposta a l'hora d'escollir i dur a terme els tractaments. L'anàlisi de dades transcriptòmiques mitjançant RNA-Seq permetrà estudiar els nivells d'expressió gènica i identificar patrons moleculars capaços de discriminar entre aquests subtipus tumorals. Aquest tipus d’anàlisi és especialment útil en medicina de precisió, ja que facilita una millor classificció dels pacients i pot contribuir a una presa de decisions terapèutiques més adequada.
 
-A partir d'aquestes dades, aplicarem diferents algoritmes de classificació supervisada, concretament k-NN i SVM amb l'objectiu d'identificar quin model presenta un millor rendiment predictiu.
+A partir d'aquestes dades, s'aplicaran diferents algoritmes de classificació supervisada, concretament k-NN i SVM amb l'objectiu d'identificar quin model presenta un millor rendiment predictiu.
 
 L'objectiu principal del treball és desenvolupar i comparar diferents models de classificació supervisada per discriminar els subtipus de càncer de mama. 
 
@@ -41,21 +41,21 @@ str(dades)
 sum(is.na(dades))
 ```
 
-El primer que hem de veure és que tenim una taula 150x201, cosa que significa que tenim més variables que observacions. 
-Una altra cosa que cal observar és que la variable Y (variable que indica el subtipus de càncer de mama) és una variable de caràcters que haurem de passar a factor, ja que els algoritmes de classificació supervisada requereixen que la variable depenent sigui categòrica. La resta de variables, evidentment, són numèriques.
+El primer que s'ha de veure és que la taula de les dades és de dimensió 150x201, cosa que significa que la taula disposa de més variables que observacions. 
+Una altra cosa que cal observar és que la variable Y (variable que indica el subtipus de càncer de mama) és una variable de caràcters que s'haurà de passar a factor, ja que els algoritmes de classificació supervisada requereixen que la variable depenent sigui categòrica. La resta de variables, evidentment, són numèriques.
 
 ```{r}
 dades$Y <- as.factor(dades$Y)
 table(dades$Y)
 ```
 
-Una dada important a conèixer de les dades és quina és la distribució dels subtipus tumorals. Aquesta distribució mostra un cert desequilibri entre classes, especialment pel major nombre de mostres del subtipus LumA respecte a Her2, fet que haurem de tenir sempre en compte durant l'avaluació dels models de classificació.
+Una dada important a conèixer de les dades és quina és la distribució dels subtipus tumorals. Aquesta distribució mostra un cert desequilibri entre classes, especialment pel major nombre de mostres del subtipus LumA respecte a Her2, fet que s'haurà de tenir sempre en compte durant l'avaluació dels models de classificació.
 
-Per aprofundir una mica més en l'avaluació de les dades que tenim, hem considerat convenient fer algunes tècniques per controlar la qualitat de les dades.
+Per aprofundir una mica més en l'avaluació de les dades de les quals es disposa, s'ha considerat convenient dur a terme algunes tècniques per controlar la qualitat de les dades.
 
 ### BOXPLOTS
 
-Primer de tot, hem considerat que per saber una mica quins podrien ser els gens més rellevants per a aquest estudi, podem fer un diagrama de caixes dels gens amb major variància
+Primer de tot, s'ha considerat que per saber una mica quins podrien ser els gens més rellevants per a aquest estudi, resulta de notòria utilitat fer un diagrama de caixes dels gens amb major variància
 
 ```{r}
 #Selecció dels gens amb més variància
@@ -64,7 +64,7 @@ top_genes <- names(sort(variancies, decreasing = TRUE))[1:5]
 top_genes
 ```
 
-Primer de tot, per entendre bé biològicament els resultats, proporcionarem informació sobre aquests 5 gens:
+Primer de tot, per entendre bé biològicament els resultats, es proporciona informació sobre aquests 5 gens:
 
 - STC2: Aquest gen codifica una glicoproteïna homodimèrica secretada que s'expressa en una gran varietat de teixits i pot tenir funcions autocrines o paracrines. La proteïna codificada té 10 dels seus 15 residus de cisteïna conservats entre els membres de la família de la estanniocalcina i és fosforilada per la caseïna cinasa 2 exclusivament en els seus residus de serina. 
 
@@ -77,38 +77,118 @@ Primer de tot, per entendre bé biològicament els resultats, proporcionarem inf
 - SEMA3C: Aquest gen codifica una glicoproteïna secretada que pertany a la família de senyals de guia neuronal semaforina de classe 3. Un augment de l'expressió d'aquest gen es correlaciona amb un increment en la invasió i l'adhesió de cèl·lules canceroses. A més a més, les mutacions d'origen natural en aquest gen s'associen amb la malaltia de Hirschsprung (trastorn genètic que causa obstruccions intestinals greus des del naixement)
 
 ```{r}
-boxplot(dades$STC2 ~ dades$Y)
+colors_subtipus <- c("Basal" = "blue",   # Blau
+                     "Her2"  = "springgreen",   # Vermell
+                     "LumA"  = "purple")   # Verd
+
+b1 <- ggplot(dades, aes(x = Y, y = STC2, fill = Y)) +
+  geom_boxplot(alpha = 0.8, outlier.size = 1.5, outlier.alpha = 0.5) +
+  scale_fill_manual(values = colors_subtipus) +
+  labs(title = "Expressió del gen STC2",
+       subtitle = "Per subtipus de càncer de mama",
+       x = "Subtipus tumoral",
+       y = "Nivell d'expressió normalitzat",
+       fill = "Subtipus") +
+  theme_minimal() +
+  theme(legend.position = "none",
+        plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+        plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray30"),
+        axis.title = element_text(size = 12),
+        axis.text = element_text(size = 10),
+        panel.grid.major = element_line(color = "gray90", linewidth = 0.3),
+        panel.grid.minor = element_blank())
+b1
 ```
 
-El boxplot amb el gen STC2 suggereix que té més expressió amb el subtipus tumoral LumA. En els altres dos subtipus tumorals, veiem punts que són outliers, en el cas de Her2, veiem dos outliers per sobre i en el cas Basal, veiem dos outliers inferiors.
+El boxplot amb el gen STC2 suggereix que té més expressió amb el subtipus tumoral LumA. En els altres dos subtipus tumorals, s'observen punts que són outliers. Een el cas de Her2, es poden veure dos outliers per sobre de la caixa i en el cas Basal, es poden observar dos outliers inferiors a la caixa.
 
 ```{r}
-boxplot(dades$APOD ~ dades$Y)
+b2 <- ggplot(dades, aes(x = Y, y = APOD, fill = Y)) +
+  geom_boxplot(alpha = 0.8, outlier.size = 1.5, outlier.alpha = 0.5) +
+  scale_fill_manual(values = colors_subtipus) +
+  labs(title = "Expressió del gen APOD",
+       subtitle = "Per subtipus de càncer de mama",
+       x = "Subtipus tumoral",
+       y = "Nivell d'expressió normalitzat") +
+  theme_minimal() +
+  theme(legend.position = "none",
+        plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+        plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray30"),
+        axis.title = element_text(size = 12),
+        axis.text = element_text(size = 10),
+        panel.grid.major = element_line(color = "gray90", linewidth = 0.3),
+        panel.grid.minor = element_blank())
+b2
 ```
 
-En el boxplot amb el gen APOD, veiem que amb el subtipus Basal el gen té menys expressió gènica que amb els altres dos subtipus tumorals, amb l'excepció d'un outlier que està per sobre els nivells esperats de Her2 i LumA.
+En el boxplot amb el gen APOD, s'observa que amb el subtipus Basal el gen té menys expressió gènica que amb els altres dos subtipus tumorals, amb l'excepció d'un outlier dins de Basal, que està per sobre els nivells esperats de Her2 i LumA.
 
 ```{r}
-boxplot(dades$NTN4 ~ dades$Y)
+b3 <- ggplot(dades, aes(x = Y, y = NTN4, fill = Y)) +
+  geom_boxplot(alpha = 0.8, outlier.size = 1.5, outlier.alpha = 0.5) +
+  scale_fill_manual(values = colors_subtipus) +
+  labs(title = "Expressió del gen NTN4",
+       subtitle = "Per subtipus de càncer de mama",
+       x = "Subtipus tumoral",
+       y = "Nivell d'expressió normalitzat") +
+  theme_minimal() +
+  theme(legend.position = "none",
+        plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+        plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray30"),
+        axis.title = element_text(size = 12),
+        axis.text = element_text(size = 10),
+        panel.grid.major = element_line(color = "gray90", linewidth = 0.3),
+        panel.grid.minor = element_blank())
+b3
 ```
 
-El boxplot amb el gen NTN4, veiem que Basal torna a ser el subtipus tumoral en el que veiem menys expressió gènica i LumA té més expressió gènica en comparació amb els altres dos subtipus.
+En el boxplot amb el gen NTN4, s'observa que Basal torna a ser el subtipus tumoral en el que es pot observar menys expressió gènica i LumA té més expressió gènica en comparació amb els altres dos subtipus.
 
 ```{r}
-boxplot(dades$MEX3A ~ dades$Y)
+b4 <- ggplot(dades, aes(x = Y, y = MEX3A, fill = Y)) +
+  geom_boxplot(alpha = 0.8, outlier.size = 1.5, outlier.alpha = 0.5) +
+  scale_fill_manual(values = colors_subtipus) +
+  labs(title = "Expressió del gen MEX3A",
+       subtitle = "Per subtipus de càncer de mama",
+       x = "Subtipus tumoral",
+       y = "Nivell d'expressió normalitzat") +
+  theme_minimal() +
+  theme(legend.position = "none",
+        plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+        plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray30"),
+        axis.title = element_text(size = 12),
+        axis.text = element_text(size = 10),
+        panel.grid.major = element_line(color = "gray90", linewidth = 0.3),
+        panel.grid.minor = element_blank())
+b4
 ```
 
-El gen MEX3A és al revés que el gen NTN4 i el subtipus tumoral amb més expressió gènica és el Basal. A més a més, ens podem adonar que té molta menys variabilitat. LumA és el subtipus amb menys expressió gènica en aquest cas. 
+El gen MEX3A és al revés que el gen NTN4 i el subtipus tumoral amb més expressió gènica és el Basal. A més a més, es pot observar que té molta menys variabilitat. LumA és el subtipus amb menys expressió gènica en aquest cas. 
 
 ```{r}
-boxplot(dades$SEMA3C ~ dades$Y)
+b5 <- ggplot(dades, aes(x = Y, y = SEMA3C, fill = Y)) +
+  geom_boxplot(alpha = 0.8, outlier.size = 1.5, outlier.alpha = 0.5) +
+  scale_fill_manual(values = colors_subtipus) +
+  labs(title = "Expressió del gen SEMA3C",
+       subtitle = "Per subtipus de càncer de mama",
+       x = "Subtipus tumoral",
+       y = "Nivell d'expressió normalitzat") +
+  theme_minimal() +
+  theme(legend.position = "none",
+        plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+        plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray30"),
+        axis.title = element_text(size = 12),
+        axis.text = element_text(size = 10),
+        panel.grid.major = element_line(color = "gray90", linewidth = 0.3),
+        panel.grid.minor = element_blank())
+b5
 ```
 
 El gen SEMA3C és un gen amb molta expressió gènica i Basal és el subtipus tumoral amb menys expressió gènica i Her2 i LumA tenen expressions gèniques similars tot i que l'expressió gènica de LumA és una mica superior a la de Her2.
 
 ### PCA
 
-Una tècnica fonamental en l'anàlisi exploratori de les dades òmiques és fer PCA sobre totes les variables predictores. És una tècnica molt útil per reduir la dimensionalitat del conjunt de dades i ens permet visualitzar possibles patrons de separació entre classes. Bàsicament, és una tècnica consistent en transformar les variables originals en un conjunt reduït de components ortogonals que expliquen la major part de la variabilitat total del conjunt de dades. Aquesta tècnica permet una representació visual més senzilla i facilita la identificació de possibles agrupacions naturals entre mostres. 
+Una tècnica fonamental en l'anàlisi exploratori de les dades òmiques és fer PCA sobre totes les variables predictores. És una tècnica molt útil per reduir la dimensionalitat del conjunt de dades i permet visualitzar possibles patrons de separació entre classes. Bàsicament, és una tècnica consistent en transformar les variables originals en un conjunt reduït de components ortogonals que expliquen la major part de la variabilitat total del conjunt de dades. Aquesta tècnica permet una representació visual més senzilla i facilita la identificació de possibles agrupacions naturals entre mostres. 
 
 ```{r}
 pca <- prcomp(dades[,-1], scale. = TRUE)
@@ -116,7 +196,7 @@ pca <- prcomp(dades[,-1], scale. = TRUE)
 fviz_pca_ind(pca, col.ind = dades$Y, palette = c("blue","springgreen","purple"))
 ```
 
-Observem que hi ha diferències entre els tres subtipus en les dues primeres dimensions. Tal i com indica els eixos del gràfic, la dimensió 1 explica el 18,9% de la variabilitat i la dimensió 2 expica el 13,1% de la variabilitat. Clarament, el gràfic mostra una separació entre els subtipus tumorals. Sobretot, veiem diferències a la dimensió 1, ja que a la dimensió 2 estan completament disperses. A l'esquerra de l'eix Y = 0, veiem el gen LumA, al centre el gen Her2 que és el gen, que a simple vista, sembla que té més dispersió. A la dreta de l'eix Y = 0, hi ha el gen Basal.
+S'observa que hi ha diferències entre els tres subtipus en les dues primeres dimensions. Tal i com indica els eixos del gràfic, la dimensió 1 explica el 18,9% de la variabilitat i la dimensió 2 expica el 13,1% de la variabilitat. Clarament, el gràfic mostra una separació entre els subtipus tumorals. Sobretot, s'observa diferències a la dimensió 1, ja que a la dimensió 2 estan completament disperses. A l'esquerra de l'eix Y = 0, veiem el gen LumA, al centre el gen Her2 que és el gen, que a simple vista, sembla que té més dispersió. A la dreta de l'eix Y = 0, hi ha el gen Basal.
 
 ### HEATMAP
 
@@ -124,11 +204,11 @@ Observem que hi ha diferències entre els tres subtipus en les dues primeres dim
 pheatmap(dades[, top_genes])
 ```
 
-En aquest mapa de calor, veiem que hi ha algunes mostres on el gen STC2 està molt més expressat. Després, també podem veure diferències per gens, gens que en algunes mostres s'expressen molt sembla provocar que un altre gen s'expressi menys, com per exemple en el cas de les mostres on STC2 té més expressió, MEX3A en té molta menys. 
+En aquest mapa de calor, s'observa que hi ha algunes mostres on el gen STC2 està molt més expressat. Després, també es poden veure diferències per gens, gens que en algunes mostres s'expressen molt sembla provocar que un altre gen s'expressi menys, com per exemple en el cas de les mostres on STC2 té més expressió, MEX3A en té molta menys. 
 
 ## SEPARACIÓ TRAIN/TEST
 
-Per garantir la comparabilitat entre models, tots els algoritmes els entrenem i avaluarem utilitzant exactament la mateixa partició de train i test. Seguint les indicacions de l'enunciat, utilitzarem una llavor fixa per garantir la reproductibilitat dels resultats. 
+Per garantir la comparabilitat entre models, tots els algoritmes els entrenem i avaluarem utilitzant exactament la mateixa partició de train i test. Seguint les indicacions de l'enunciat, s'utilitzarà una llavor fixa per garantir la reproductibilitat dels resultats. 
 
 ```{r}
 set.seed(213)
