@@ -568,3 +568,8 @@ Anota a la pràctica que l'AUC és perfecte (1.0) perquè el Kernel Lineal amb a
 - https://portal.gdc.cancer.gov/genes/ENSG00000074527
 - https://sebbm.es/revista/investigacion/mex3a-una-proteina-necesaria-para-mantener-el-reservorio-de-celulas-madre/
 - https://www.ncbi.nlm.nih.gov/gene/10512 
+- https://scikit-learn.org/stable/modules/svm.html#kernel-functions
+- https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.GridSearchCV.html#sklearn.model_selection.GridSearchCV
+- https://rpubs.com/joser/caret
+
+- https://www.ncbi.nlm.nih.gov/gene/10512 
