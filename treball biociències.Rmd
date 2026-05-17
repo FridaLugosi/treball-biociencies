@@ -7,6 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(error = TRUE)
 ```
 
 ```{r}
@@ -15,6 +16,9 @@ library(factoextra)
 library(pheatmap)
 library(caret)
 library(pROC)
+library(class)
+library(kernlab)
+library(ROCR)
 ```
 
 
@@ -31,6 +35,7 @@ L'objectiu principal del treball és desenvolupar i comparar diferents models de
 ## IMPORTACIÓ i ANÀLISI EXPLORATORI DE LES DADES
 
 ```{r}
+setwd("/Users/vinyethernan/ESTADÍSTICA/BIOCIENCIES/Treball")
 dades <- read.csv("rna.csv")
 ```
 
@@ -234,8 +239,6 @@ Amb la següent funció utilitzarem aquest mètode, calcularem la distància euc
 Tal i com s'ha explicat abans; farem servir el cross-validation de 3 folds. Explorarem els valors k = 1, 3, 5, 7, 11 per trobar el nombre òptim de veïns per aquest conjunt de dades.  
  
 ```{r}
-library(caret)
-
 # mètode d'entrenament del 3-fold cv (validació creuada)
 ctrl <- trainControl(method = "cv", number = 3)
 
@@ -282,6 +285,9 @@ Per projectar les dades en 2D, hem escollit els gens STC2 i APOD atès que, com 
 # trio els 2 gens
 gen1 <- "STC2"
 gen2 <- "APOD"
+
+# Ho he posat perquè sinó no funcionava el codi - Vinyet
+prediccions_knn <- predict(model_knn, newdata = data.test)
 
 resultats_vis <- data.frame(
   G1 = data.test[, gen1],
@@ -482,8 +488,6 @@ MATRIU DE CONFUSIÓ (part de la Dongjun)
 **Bueno, pensava que tmb havia de fer la matriu de confusió de knn, pero vamos creo que no. Així que Dongjun et deixo aquest script (ns si el necessitaràs per a fer la teva part o no; pero eso)**
 - Iris :))
 ```{r}
-prediccions_knn <- predict(model_knn, newdata = data.test)
-
 # Calculem la matriu de confusió i les mètriques de qualitat
 matriu_conf_knn <- confusionMatrix(prediccions_knn, data.test$Y)
 matriu_conf_knn
@@ -493,16 +497,66 @@ matriu_conf_knn
 
 ##########################################################
 
+# Per a cada algorisme, ajusta un classificador per discriminar les classes: Basal i Her2 amb la parametrització òptima de l’apartat 2. Obté la corba ROC i l'AUC en el conjunt test.
 
 
 
+```{r}
+# Eliminació de les dades de la classe LumA de les bases de dades train i test
+data.train_bin <- data.train[data.train$Y %in% c("Basal", "Her2"),]
+data.train_bin$Y <- droplevels(data.train_bin$Y)
+data.test_bin <- data.test[data.test$Y %in% c("Basal", "Her2"),]
+data.test_bin$Y <- droplevels(data.test_bin$Y)
 
+# Parametrització òptima de l'apartat 2
+k_ideal <- 3 # knn
+c_ideal <- 0.03125 # svm, kernel lineal
 
+# Model KNN binari amb parametrització òptima
+knn_model_bin <- knn(train = subset(data.train_bin, select = -Y), 
+                  test = subset(data.test_bin, select = -Y),
+                  data.train_bin$Y, 
+                  k = k_ideal,
+                  prob = T)
+confusionMatrix(knn_model_bin, data.test_bin$Y)
 
+# Model SVM binari amb parametrització òptima
+svm_lineal_bin <- ksvm(Y ~ ., data = data.train_bin, kernel = "vanilladot",
+                       type="C-svc", C = c_ideal, prob.model = TRUE)
+svm_lineal_predict <- predict(svm_lineal_bin, 
+                              subset(data.test_bin, select = -Y))
+confusionMatrix(svm_lineal_predict, data.test_bin$Y)
 
+# Corbes ROC + AUC per comparar els dos models
+# KNN
+prob <- attr(knn_model_bin, "prob")
+prob1 <- ifelse(knn_model_bin == "Her2", prob, 1-prob)
+pred_knn <- ROCR::prediction(predictions = prob1,
+                             labels = as.factor(data.test_bin$Y),
+                             label.ordering = c("Basal", "Her2"))
+perf <- performance(pred_knn, "tpr", "fpr")
+perf.auc <- performance(pred_knn, measure="auc")
+perf.auc <- unlist(perf.auc@y.values)
+plot(perf, avg= "threshold", lwd=3, colorize=F,
+     main = paste("KNN amb k =", k_ideal, ", ROC curve,", "AUC =", round(perf.auc,4)))
+abline(a = 0, b = 1, lwd = 1, lty = 2)
+# SVM
+svm_lineal_predict <- predict(svm_lineal_bin, 
+                              subset(data.test_bin, select = -Y),
+                              type = "probabilities")
+prob1 <- svm_lineal_predict[,2]
+pred_svm <- ROCR::prediction(predictions= prob1,
+                             labels = as.factor(data.test_bin$Y),
+                             label.ordering = c("Basal", "Her2"))
+perf <- performance(pred_svm, "tpr", "fpr")
+perf.auc <- performance(pred_svm, measure="auc")
+perf.auc <- unlist(perf.auc@y.values)
+plot(perf, avg= "threshold", lwd=3, colorize=F,
+     main = paste("SVM lineal amb C = ", c_ideal, ", ROC curve, AUC = ", round(perf.auc, 4)))
+abline(a = 0, b = 1, lwd = 1, lty = 2)
+```
 
-
-
+Anota a la pràctica que l'AUC és perfecte (1.0) perquè el Kernel Lineal amb aquestes 2000 variables ha trobat un hiperplà capaç de separar de forma completa els patrons genètics del teixit Basal respecte del teixit Her2. Si la matriu de confusió mostrava dos falsos positius, era únicament perquè el llindar de decisió per defecte no estava situat en el punt de tall òptim definit per la corba ROC.
 
 # REFERÈNCIES
 
