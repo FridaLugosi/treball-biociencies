@@ -3,6 +3,15 @@ title: "Treball Bio"
 author: "Iris Arevalo, Vinyet Hernan, Ernest Juncosa, Dongjun Li i Frida Lugosi"
 date: "2026-05-01"
 output: html_document
+toc: true
+lang: ca
+params:
+  mypath_in: "input/"
+  mypath_out: "output"
+  bbdd: "rna"
+  seed: 123
+bibliography: Alon.bib
+geometry: margin=2cm    
 ---
 
 ```{r setup, include=FALSE}
@@ -19,12 +28,13 @@ library(pROC)
 library(class)
 library(kernlab)
 library(ROCR)
+library(gridExtra)
 ```
 
 
 # INTRODUCCIÓ i OBJECTIUS
 
-El treball que s'ha escollit consisteix en un anàlisi d'un subconjunt de dades òmiques generades pel TCGA corresponent a 150 mostres de tumors de mama prèviament normalitzades i filtrades. La primera columna del conjunt de dades indica el subtipus tumoral, mentre que la resta de columnes corresponen a l'expressió normalitzada de gens seleccionats. El treball és sobre el càncer de mama, que és una malaltia altament heterogènia que presenta diferents subtipus moleculars amb característiques biològiques i clíniques diferenciades. Entre aquests subtipus, n'hi ha tres que són altament rellevants (Basal, Her2 i LumA). Són especialment rellevants per la seva implicació en el pronòstic i en la resposta a l'hora d'escollir i dur a terme els tractaments. L'anàlisi de dades transcriptòmiques mitjançant RNA-Seq permetrà estudiar els nivells d'expressió gènica i identificar patrons moleculars capaços de discriminar entre aquests subtipus tumorals. Aquest tipus d’anàlisi és especialment útil en medicina de precisió, ja que facilita una millor classificció dels pacients i pot contribuir a una presa de decisions terapèutiques més adequada.
+El treball que s'ha escollit consisteix en un anàlisi d'un subconjunt de dades òmiques generades per *The Cancer Genome Atlas Network* (TCGA) corresponent a 150 mostres de tumors de mama prèviament normalitzades i filtrades. La primera columna del conjunt de dades indica el subtipus tumoral, mentre que la resta de columnes corresponen a l'expressió normalitzada de gens seleccionats. El treball és sobre el càncer de mama, que és una malaltia altament heterogènia que presenta diferents subtipus moleculars amb característiques biològiques i clíniques diferenciades. Entre aquests subtipus, n'hi ha tres que són altament rellevants (Basal, Her2 i LumA). Són especialment rellevants per la seva implicació en el pronòstic i en la resposta a l'hora d'escollir i dur a terme els tractaments. L'anàlisi de dades transcriptòmiques mitjançant RNA-Seq permetrà estudiar els nivells d'expressió gènica i identificar patrons moleculars capaços de discriminar entre aquests subtipus tumorals. Aquest tipus d’anàlisi és especialment útil en medicina de precisió, ja que facilita una millor classificció dels pacients i pot contribuir a una presa de decisions terapèutiques més adequada.
 
 A partir d'aquestes dades, s'aplicaran diferents algoritmes de classificació supervisada, concretament k-NN i SVM amb l'objectiu d'identificar quin model presenta un millor rendiment predictiu.
 
@@ -32,11 +42,11 @@ L'objectiu principal del treball és desenvolupar i comparar diferents models de
 
 # MATERIALS i MÈTODES
 
-## IMPORTACIÓ i ANÀLISI EXPLORATORI DE LES DADES
+## Anàlisi exploratori de les dades
 
 ```{r}
-setwd("/Users/vinyethernan/ESTADÍSTICA/BIOCIENCIES/Treball")
-dades <- read.csv("rna.csv")
+bbdd <- paste(params$bbdd,".csv",sep="")
+dades <- read.csv(paste(params$mypath_in,bbdd,sep=""))
 ```
 
 ```{r}
@@ -50,21 +60,23 @@ El primer que s'ha de veure és que la taula de les dades és de dimensió 150x2
 Una altra cosa que cal observar és que la variable Y (variable que indica el subtipus de càncer de mama) és una variable de caràcters que s'haurà de passar a factor, ja que els algoritmes de classificació supervisada requereixen que la variable depenent sigui categòrica. La resta de variables, evidentment, són numèriques.
 
 ```{r}
-dades$Y <- as.factor(dades$Y)
-table(dades$Y)
+Y_factor <- factor(dades$Y, levels=c("Basal", "Her2","LumA"))
+dadesX <- dades[,-1]
+
+table(Y_factor)
 ```
 
 Una dada important a conèixer de les dades és quina és la distribució dels subtipus tumorals. Aquesta distribució mostra un cert desequilibri entre classes, especialment pel major nombre de mostres del subtipus LumA respecte a Her2, fet que s'haurà de tenir sempre en compte durant l'avaluació dels models de classificació.
 
 Per aprofundir una mica més en l'avaluació de les dades de les quals es disposa, s'ha considerat convenient dur a terme algunes tècniques per controlar la qualitat de les dades.
 
-### BOXPLOTS
+### Boxplots
 
 Primer de tot, s'ha considerat que per saber una mica quins podrien ser els gens més rellevants per a aquest estudi, resulta de notòria utilitat fer un diagrama de caixes dels gens amb major variància
 
 ```{r}
 #Selecció dels gens amb més variància
-variancies <- apply(dades[,-1], 2, var)
+variancies <- apply(dadesX, 2, var)
 top_genes <- names(sort(variancies, decreasing = TRUE))[1:5]
 top_genes
 ```
@@ -196,14 +208,13 @@ El gen SEMA3C és un gen amb molta expressió gènica i Basal és el subtipus tu
 Una tècnica fonamental en l'anàlisi exploratori de les dades òmiques és fer PCA sobre totes les variables predictores. És una tècnica molt útil per reduir la dimensionalitat del conjunt de dades i permet visualitzar possibles patrons de separació entre classes. Bàsicament, és una tècnica consistent en transformar les variables originals en un conjunt reduït de components ortogonals que expliquen la major part de la variabilitat total del conjunt de dades. Aquesta tècnica permet una representació visual més senzilla i facilita la identificació de possibles agrupacions naturals entre mostres. 
 
 ```{r}
-pca <- prcomp(dades[,-1], scale. = TRUE)
-#library(factoextra)
-fviz_pca_ind(pca, col.ind = dades$Y, palette = c("blue","springgreen","purple"))
+pca <- prcomp(dadesX, scale. = TRUE)
+fviz_pca_ind(pca, col.ind = Y_factor, palette = c("blue","springgreen","purple"))
 ```
 
 S'observa que hi ha diferències entre els tres subtipus en les dues primeres dimensions. Tal i com indica els eixos del gràfic, la dimensió 1 explica el 18,9% de la variabilitat i la dimensió 2 expica el 13,1% de la variabilitat. Clarament, el gràfic mostra una separació entre els subtipus tumorals. Sobretot, s'observa diferències a la dimensió 1, ja que a la dimensió 2 estan completament disperses. A l'esquerra de l'eix Y = 0, veiem el gen LumA, al centre el gen Her2 que és el gen, que a simple vista, sembla que té més dispersió. A la dreta de l'eix Y = 0, hi ha el gen Basal.
 
-### HEATMAP
+### Heatmap
 
 ```{r}
 pheatmap(dades[, top_genes])
@@ -211,12 +222,18 @@ pheatmap(dades[, top_genes])
 
 En aquest mapa de calor, s'observa que hi ha algunes mostres on el gen STC2 està molt més expressat. Després, també es poden veure diferències per gens, gens que en algunes mostres s'expressen molt sembla provocar que un altre gen s'expressi menys, com per exemple en el cas de les mostres on STC2 té més expressió, MEX3A en té molta menys. 
 
-## SEPARACIÓ TRAIN/TEST
+## Mètodes utilitzats en l'anàlisi
+
+
+
+# PROCEDIMENT
+
+## 0. Separació train/test
 
 Per garantir la comparabilitat entre models, tots els algoritmes els entrenem i avaluarem utilitzant exactament la mateixa partició de train i test. Seguint les indicacions de l'enunciat, s'utilitzarà una llavor fixa per garantir la reproductibilitat dels resultats. 
 
 ```{r}
-set.seed(213)
+set.seed(params$seed)
 
 n <- nrow(dades)
 train_idx <- sample(1:n,size=round(0.67 * n))
@@ -225,13 +242,33 @@ data.train <- dades[train_idx,]
 data.test <- dades[-train_idx,]
 ```
 
+```{r}
+set.seed(params$seed)
+p <- 0.67
+n <- nrow(dadesX)
+training <- sample(1:n,p*nrow(dadesX))
 
-# RESULTATS
+
+xtrain <- dadesX[training,]
+dim(xtrain)
+
+xtest <- dadesX[-training,]
+dim(xtest)
+
+
+ytrain <- Y_factor[training]
+ytest<- Y_factor[-training]
+
+mydata<-data.frame(ytrain,xtrain)
+```
+
+
 
 Per evitar que l'algoritme memoritzi les dades i creii un sobreajust, farem servir cross-validation de 3 folds. Això vol dir que les dades estaràn dividides en 3 parts diferents (*tal i com es pot observar en el chunk anterior*): 2 les farem servir per a entrenar el model i següdament amb la 3 era part de les dades es valida. Repetirem el procés  per assegurar que el model serà robust davant de dades noves. 
 
 
 ## 1. Classificació amb k-Nearest Neighbour
+
 El mètode de **K-Nearest Neighbour (KNN)** consisteix en crear una nova mostra per a observar la classe pertinent de les mostres veïnes; és a dir, aquelles que són més properes a ella en l'espei de dades. 
 
 Amb la següent funció utilitzarem aquest mètode, calcularem la distància euclidiana (*que és la típica en aquest cas*)d'un punt cap als seus "k" veïns més propers a partir dels nivells d'expressió dels gens (que actuen en aquest cas com variables predictores). Finalment assignarem la classe majoritària entre els k veïns a la nova mostra.  
@@ -248,7 +285,7 @@ valors_k <- expand.grid(k = c(1, 3, 5, 7, 11))
 Ara entrenem el model KNN usant la variable Y com a resposta i tota la resta com a predictors. Hem estandaritzat les dades perquè KNN es basa en distàncies i sabem que és molt sensible a l'escala de les pròpies dades per a calcular-les.  
 
 ```{r}
-set.seed(123)
+set.seed(params$seed)
 model_knn <- train(Y ~ ., 
                    data = data.train, 
                    method = "knn", 
@@ -287,13 +324,14 @@ gen1 <- "STC2"
 gen2 <- "APOD"
 
 # Ho he posat perquè sinó no funcionava el codi - Vinyet
-prediccions_knn <- predict(model_knn, newdata = data.test)
+pred_knn <- predict(model_knn, newdata = xtest)
+
 
 resultats_vis <- data.frame(
-  G1 = data.test[, gen1],
-  G2 = data.test[, gen2],
-  Real = data.test$Y,
-  Prediccio = prediccions_knn
+  G1 = xtest[, gen1],
+  G2 = xtest[, gen2],
+  Real = ytest,
+  Prediccio = pred_knn
 )
 
 # on s'ha equivocat el model
@@ -318,8 +356,6 @@ La gran majoria de elements que hi ha en el gràfic són cercles, fet que reflec
 Per a una millor explicació, representarem ara el mateix gràfic, però amb les diferentes k's. 
 
 ```{r}
-library(gridExtra)
-
 gen1 <- "STC2"
 gen2 <- "APOD"
 
@@ -331,7 +367,7 @@ llista_grafics <- list()
 for(i in seq_along(k_valors)) {
   k_actual <- k_valors[i]
 
-  set.seed(123)
+  set.seed(params$seed)
   model_temp <- train(Y ~ ., 
                       data = data.train, 
                       method = "knn", 
@@ -339,12 +375,12 @@ for(i in seq_along(k_valors)) {
                       preProcess = c("center", "scale"),
                       trControl = trainControl(method = "none")) 
   
-  pred_temp <- predict(model_temp, newdata = data.test)
+  pred_temp <- predict(model_temp, newdata = xtest)
   
   res_temp <- data.frame(
-    G1 = data.test[, gen1],
-    G2 = data.test[, gen2],
-    Real = data.test$Y,
+    G1 = xtest[, gen1],
+    G2 = xtest[, gen2],
+    Real = ytest,
     Prediccio = pred_temp
   )
   res_temp$Correcte <- ifelse(res_temp$Real == res_temp$Prediccio, "Sí", "No")
@@ -372,21 +408,8 @@ Amb aquestes evidències visuals, queda clar que k=3 és un equilibri ideal entr
 
 
 
-# DISCUSSIÓ
+## 2. Classificació amb Support Vector Machine
 
-################################################## 
-
-# Missatge per a la Frida de part de la Iris: 
-**Com ja he fet KNN, he decidit fer com una secció per a la discussió dels resultats, quan tinguis tu la teva part feta; la posem en comú i trobem finalment quin és el millor. Per a no oblidar els resultats i la part de discussió meva; la posaré aquí**
-
-En el mètode de KNN, que es basa en la proximitat de l'expressió gènica entre mostres, hem obserat que et fet de tindre una base de addes gran (amnb 200 gens), la qualitat del knn depèn de la mètrica de distància. Per a això abans de realitar aquest mètode s'ha hagut d'estandarditzar. S'ha escollit el model amb k=3 perquè era el que presentava els valors més alts d'accurancy i Kappa, per lo tant, representa el model amb major capacitat predictiva i concordança que no es deu al atzar. 
-
-*El següent pas serà contrastar l'eficiència i capacitat separadora d'aquests mateixos gens mitjançant fronteres lineals i radials complexes (SVM) per veure quin enfocament captura millor la base biològica del problema.* -- te toca Friday :)
-
-
-#################################################
-
-## SVM
 Primer de tot s'indica que es vol entrenar el model amb 3 fold-cross validation, això es fa indicant als paràmetres el mètode "cv" (cross-validation) i com que es volen 3 folds, number 3. Amb els folds el que es consegueix és dividir les dades en 3 parts iguals on es fan tres iteracions. S'entrena amb dos folds i es valida amb el que resta. Amb aquest mètode s'utilitzen millor les dades ja que, com que es tenen molts gens en el data-set no es pot permetre perdre dades.
 
 ```{r}
@@ -401,21 +424,14 @@ Com que l’objectiu d’aquest algorisme és separar les classes mitjançant un
 
 En primer lloc, s’explora el kernel lineal, que no aplica cap transformació i genera fronteres de decisió lineals.
 
-*Kernel lineal*
-S'entrena el model amb la formula del model, utilitzant totes les variables, s'utilitzen les dades que han sigut expressament separades per entrenar el model amb el tractament de control `trControl` establert abans (3 fold-cross validation). S'aplica `svmLinear`, que és la funció kernel, com s'ha comentat anteriorment. És important escalar les variables en l'algorisme SVM, i per tant es fa un preprocessament `preProcess` on es centren i s'escalen. I finalment, es defineixen els valors dels paràmetres de l'hiperplà `tuneGrid=expand.grid()` on es van provant diferents valors fins trobar l'adequat.
-```{r}
-set.seed(123)
+#### Kernel lineal
 
-modelo_svm_lineal <- train(
-  Y ~ .,
-  data = data.train,
-  method = "svmLinear",
-  trControl = control,
-  preProcess = c("center", "scale"),
-  tuneGrid = expand.grid(
-    C = 2^(-the -5:10)
-  )
-)
+S'entrena el model amb la formula del model, utilitzant totes les variables, s'utilitzen les dades que han sigut expressament separades per entrenar el model amb el tractament de control `trControl` establert abans (3 fold-cross validation). S'aplica `svmLinear`, que és la funció kernel, com s'ha comentat anteriorment. És important escalar les variables en l'algorisme SVM, i per tant es fa un preprocessament `preProcess` on es centren i s'escalen. I finalment, es defineixen els valors dels paràmetres de l'hiperplà `tuneGrid=expand.grid()` on es van provant diferents valors fins trobar l'adequat.
+
+```{r}
+set.seed(params$seed)
+
+modelo_svm_lineal <- train(ytrain ~ ., data = mydata, method = "svmLinear", trControl = control, preProcess = c("center", "scale"), tuneGrid = expand.grid(C = 2^(-5:10)))
 modelo_svm_lineal
 plot(modelo_svm_lineal, xlim=c(-10,100))
 ```
@@ -426,48 +442,38 @@ Amb el gráfic es recolzen les conclusions obtenides abans, el pic del 94% indic
 Un cop el model està definit es prediuen les dades amb les que s'han separat expressament per testejar. I s'evaluen els resultats de la predicció amb la matriu de confusió. Aquesta el que fa és calcular la sentistivty, specificity, precision...
 
 ```{r}
-pred_lineal <- predict(modelo_svm_lineal, data.test)
+pred_lineal <- predict(modelo_svm_lineal, xtest)
 
-confusionMatrix(pred_lineal, data.test$Y)
+confusionMatrix(pred_lineal, ytest)
 ```
 La matriu de confusió retorna una accuracy del 0.94 i un kappa, que és l'ajust per atzar, del 0.9, aquests valors són molt bons.
 Pel que fa a les classes, el model classifica perfectament (sensitivity = 1 ) la classe LumA, mentre que es detecten petites confusions entre les classes Basal i Her2 que es poden observar en les prediccions. En la matriu de confusió es recalquen aquests petits errors en les columnes de `sensitivity` i `specificity.` Si comparem la prevalença real (`Prevalence`) amb la prevalença de predicció del model (`Detection Prevalence`), podem veure que el model tendeix a infradetectar lleugerament la categoria Basal, mentre que sobreprediu en les categories Her2 i LumA, assignant-los un percentatge de casos una mica superior al que hi ha a la mostra real.
 
 En conclusió, el model amb la funció kernel lineal està molt ben ajustat, igualment, es provarà amb la funció kernel rbf ja que aquest pot millorar o sobreajustar.
 
-*Kernel rbf*
+#### Kernel rbf
 
 De forma similar al lineal, s'usen totes les variables regressores, s'utilitzen les dades separades per entrenar amb el tractament especificat al principi, s'escalen les dades com a preprocessament. El que canvia en aquest model és el mètode `svmRadial` i que en aquest es tenen dos paràmetres a ajustar, aquests són el `C` (que també estava en el model lineal) que és quant castigues equivocar-se, i `Sigma` que signfica com de recargolada pot ser la frontera que es crea. Per establir aquests paràmetres es fa una graella i prova amb els diferents.
 
 ```{r}
-set.seed(123)
+set.seed(params$seed)
 
-grid_rbf <- expand.grid(
-  C = 2^(-5:10),
-  sigma = 2^(-10:10)
-)
+grid_rbf <- expand.grid(C = 2^(-5:10), sigma = 2^(-10:1))
 
-modelo_svm_rbf <- train(
-  Y ~ .,
-  data = data.train,
-  method = "svmRadial",
-  trControl = control,
-  preProcess = c("center", "scale"),
-  tuneGrid = grid_rbf
-)
+modelo_svm_rbf <- train(ytrain ~ ., data = mydata, method = "svmRadial", trControl = control, preProcess = c("center", "scale"), tuneGrid = grid_rbf)
+
 modelo_svm_rbf
 
 plot(modelo_svm_rbf)
-
 ```
 A partir dels resultats del model mostra que ,moltes combinacions de C i sigma donen una accuracy propera a 0.52 i un Kappa igual a 0, indicant que el model és molt sensible a aquests paràmetres. Els quals són valors molt més petits que el lineal. Però es troba que la millor combinació és sigma 0.0009765625 i c=4 on tenen un 94.06% d'accuracy i un Kappa de 0.90, que és un rendiment molt alt.
 
 Amb el gráfic el es comparen els diferents valors de C amb els diferents valors de sigma i s'observa que una sigma petita, proper a 0, té un Accuracy més alt.
 
 ```{r}
-pred_rbf <- predict(modelo_svm_rbf, data.test)
+pred_rbf <- predict(modelo_svm_rbf, xtest)
 
-confusionMatrix(pred_rbf, data.test$Y)
+confusionMatrix(pred_rbf, ytest)
 ```
 
 Amb la predicció i la matriu de confusió aplicada en aquesta es mostra que el model presenta un rendiment molt elevat, amb una accuracy del 94% i un valor de Kappa de 0.90, indicant una classificació molt bona. El model és significativament millor que un classificador aleatori (NIR = 0.46). Pel que fa a les classes, LumA es classifica perfectament (Sensitivity = 1 ), mentre que es mostren  petites confusions a les categories Basal i Her2. Les mètriques de sensibilitat, especificitat i balanced accuracy confirmen la robustesa del model. Més específicament matriu de confusió retorna que el model infradetecta la categoria basal, i sobredetecta la Her2 i la LumA, molt semblant als resultats obtinguts amb el kernel lineal.
@@ -479,63 +485,66 @@ En conclusió, encara que el kernel RBF és més flexible, no millora el rendime
 S'observa en els dos models que Basal s'infradetecta i Her2 es sobredetecta. Això suggereix que hi ha similitud biològica real entre Basal i Her2 que val la pena explorar en estudis posteriors.
 
 
+## Comparativa d'algorismes
 
+### Matriu de confusió i metriques de qualitat
 
-
-
-######################################################
-
-# Missatge per a la Dongjun de part de la Iris
-
-MATRIU DE CONFUSIÓ (part de la Dongjun)
-**Bueno, pensava que tmb havia de fer la matriu de confusió de knn, pero vamos creo que no. Així que Dongjun et deixo aquest script (ns si el necessitaràs per a fer la teva part o no; pero eso)**
-- Iris :))
 ```{r}
-# Calculem la matriu de confusió i les mètriques de qualitat
-matriu_conf_knn <- confusionMatrix(prediccions_knn, data.test$Y)
-matriu_conf_knn
+# algorisme knn
+pred_knn <- predict(model_knn, newdata = xtest)
+confusionMatrix(pred_knn, ytest)
+
+# algorisme SVM kernel lineal
+pred_lineal <- predict(modelo_svm_lineal, newdata = xtest)
+confusionMatrix(pred_lineal, ytest)
+
+# algorisme SVM rbf
+pred_rbf <- predict(modelo_svm_rbf, newdata = xtest)
+confusionMatrix(pred_rbf, ytest)
 ```
 
 
 
-##########################################################
 
-# Per a cada algorisme, ajusta un classificador per discriminar les classes: Basal i Her2 amb la parametrització òptima de l’apartat 2. Obté la corba ROC i l'AUC en el conjunt test.
 
+### Corba ROC i l’àrea sota la corba (AUC)
+Per a cada algorisme, ajusta un classificador per discriminar les classes: Basal i Her2 amb la parametrització òptima de l’apartat 2. Obté la corba ROC i l'AUC en el conjunt test.
 
 
 ```{r}
 # Eliminació de les dades de la classe LumA de les bases de dades train i test
-data.train_bin <- data.train[data.train$Y %in% c("Basal", "Her2"),]
-data.train_bin$Y <- droplevels(data.train_bin$Y)
-data.test_bin <- data.test[data.test$Y %in% c("Basal", "Her2"),]
-data.test_bin$Y <- droplevels(data.test_bin$Y)
+dades_bin_train <- data.frame(Y = ytrain, xtrain)[ytrain %in% c("Basal", "Her2"), ]
+xtrain_bin <- dades_bin_train[,-1]
+ytrain_bin <- droplevels(dades_bin_train$Y)
+mydata_bin <- data.frame(ytrain_bin, xtrain_bin)
+
+dades_bin_test  <- data.frame(Y = ytest, xtest)[ytest %in% c("Basal", "Her2"), ]
+xtest_bin <- dades_bin_test[,-1]
+ytest_bin <- droplevels(dades_bin_test$Y)
+
 
 # Parametrització òptima de l'apartat 2
 k_ideal <- 3 # knn
 c_ideal <- 0.03125 # svm, kernel lineal
 
 # Model KNN binari amb parametrització òptima
-knn_model_bin <- knn(train = subset(data.train_bin, select = -Y), 
-                  test = subset(data.test_bin, select = -Y),
-                  data.train_bin$Y, 
-                  k = k_ideal,
-                  prob = T)
-confusionMatrix(knn_model_bin, data.test_bin$Y)
+knn_model_bin <- knn(train = xtrain_bin, test = xtest_bin, ytrain_bin, k = k_ideal, prob = T)
+
+confusionMatrix(knn_model_bin, ytest_bin)
 
 # Model SVM binari amb parametrització òptima
-svm_lineal_bin <- ksvm(Y ~ ., data = data.train_bin, kernel = "vanilladot",
+svm_lineal_bin <- ksvm(ytrain_bin ~ ., data = mydata_bin, kernel = "vanilladot",
                        type="C-svc", C = c_ideal, prob.model = TRUE)
-svm_lineal_predict <- predict(svm_lineal_bin, 
-                              subset(data.test_bin, select = -Y))
-confusionMatrix(svm_lineal_predict, data.test_bin$Y)
+
+svm_lineal_predict <- predict(svm_lineal_bin, xtest_bin)
+confusionMatrix(svm_lineal_predict, ytest_bin)
 
 # Corbes ROC + AUC per comparar els dos models
 # KNN
 prob <- attr(knn_model_bin, "prob")
 prob1 <- ifelse(knn_model_bin == "Her2", prob, 1-prob)
 pred_knn <- ROCR::prediction(predictions = prob1,
-                             labels = as.factor(data.test_bin$Y),
+                             labels = as.factor(ytest_bin),
                              label.ordering = c("Basal", "Her2"))
 perf <- performance(pred_knn, "tpr", "fpr")
 perf.auc <- performance(pred_knn, measure="auc")
@@ -545,11 +554,11 @@ plot(perf, avg= "threshold", lwd=3, colorize=F,
 abline(a = 0, b = 1, lwd = 1, lty = 2)
 # SVM
 svm_lineal_predict <- predict(svm_lineal_bin, 
-                              subset(data.test_bin, select = -Y),
+                              xtest_bin,
                               type = "probabilities")
 prob1 <- svm_lineal_predict[,2]
 pred_svm <- ROCR::prediction(predictions= prob1,
-                             labels = as.factor(data.test_bin$Y),
+                             labels = as.factor(ytest_bin),
                              label.ordering = c("Basal", "Her2"))
 perf <- performance(pred_svm, "tpr", "fpr")
 perf.auc <- performance(pred_svm, measure="auc")
@@ -560,6 +569,23 @@ abline(a = 0, b = 1, lwd = 1, lty = 2)
 ```
 
 Anota a la pràctica que l'AUC és perfecte (1.0) perquè el Kernel Lineal amb aquestes 2000 variables ha trobat un hiperplà capaç de separar de forma completa els patrons genètics del teixit Basal respecte del teixit Her2. Si la matriu de confusió mostrava dos falsos positius, era únicament perquè el llindar de decisió per defecte no estava situat en el punt de tall òptim definit per la corba ROC.
+
+
+
+
+
+# DISCUSSIÓ
+
+
+En el mètode de KNN, que es basa en la proximitat de l'expressió gènica entre mostres, hem obserat que et fet de tindre una base de addes gran (amnb 200 gens), la qualitat del knn depèn de la mètrica de distància. Per a això abans de realitar aquest mètode s'ha hagut d'estandarditzar. S'ha escollit el model amb k=3 perquè era el que presentava els valors més alts d'accurancy i Kappa, per lo tant, representa el model amb major capacitat predictiva i concordança que no es deu al atzar. 
+
+
+
+
+
+
+
+
 
 # REFERÈNCIES
 
