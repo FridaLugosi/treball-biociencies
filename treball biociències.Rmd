@@ -2,16 +2,18 @@
 title: "Treball Bio"
 author: "Iris Arevalo, Vinyet Hernan, Ernest Juncosa, Dongjun Li i Frida Lugosi"
 date: "2026-05-01"
-output: html_document
+output:
+  html_document: default
+  pdf_document: default
 toc: true
 lang: ca
 params:
-  mypath_in: "input/"
-  mypath_out: "output"
-  bbdd: "rna"
+  mypath_in: input/
+  mypath_out: output
+  bbdd: rna
   seed: 123
 bibliography: Alon.bib
-geometry: margin=2cm    
+geometry: margin=2cm
 ---
 
 ```{r setup, include=FALSE}
@@ -267,9 +269,9 @@ mydata<-data.frame(ytrain,xtrain)
 Per evitar que l'algoritme memoritzi les dades i creii un sobreajust, farem servir cross-validation de 3 folds. Això vol dir que les dades estaràn dividides en 3 parts diferents (*tal i com es pot observar en el chunk anterior*): 2 les farem servir per a entrenar el model i següdament amb la 3 era part de les dades es valida. Repetirem el procés  per assegurar que el model serà robust davant de dades noves. 
 
 
-## 1. Classificació amb k-Nearest Neighbour
+## 1. Classificació amb k-Nearest Neighbours
 
-El mètode de **K-Nearest Neighbour (KNN)** consisteix en crear una nova mostra per a observar la classe pertinent de les mostres veïnes; és a dir, aquelles que són més properes a ella en l'espei de dades. 
+El mètode de **K-Nearest Neighbour (KNN)** consisteix en crear una nova mostra (desconeguda) per a observar la classe pertinent de les mostres veïnes; és a dir, aquelles que són més properes a ella en l'espei de dades. 
 
 Amb la següent funció utilitzarem aquest mètode, calcularem la distància euclidiana (*que és la típica en aquest cas*)d'un punt cap als seus "k" veïns més propers a partir dels nivells d'expressió dels gens (que actuen en aquest cas com variables predictores). Finalment assignarem la classe majoritària entre els k veïns a la nova mostra.  
 
@@ -295,13 +297,13 @@ model_knn <- train(Y ~ .,
 
 print(model_knn)
 ```
-En els resultats obtinguts en aquesta taula s'observa que s'han utilitzat 100 mostres per a l'entrenament (són el 2/3 de les 150 que hi han) juntament amb els 200 predictors que hi han (nivells d'expressió dels gens). 
+En els resultats obtinguts en aquesta taula s'observa que s'han utilitzat 100 mostres per a l'entrenament (són el 2/3 de les 150 que hi ha) juntament amb els 200 predictors que hi ha (nivells d'expressió dels gens).
 
-Aquesta explica que els grups de validació (3 fold) han tingut mides de 66, 68 i 66 mostres. 
+Aquesta explica que els grups de validació (3 fold) han tingut mides de 67, 67 i 66 mostres.
 
-Al tindre classes desequilibrades, s'utilitza la mètrica de Kappa ja que aquesta medeix la concordança entre les prediccions del model i de la realitat. La columna d'accurancy explica quanr encerta el model de les classificacions durant la validació creuada. 
+Tot i que en casos de classes desequilibrades pot ser útil la mètrica de Kappa (ja que mesura la concordança entre les prediccions del model i la realitat), l'output ens mostra que el model ha utilitzat per defecte la columna d'accuracy per a seleccionar el model òptim. Aquesta mètrica explica quant encerta el model en les classificacions durant la validació creuada.
 
-S'observa que els valors més grans de kappa (0.8336145) i accurancy (0.9013480) estàn amb la k=3, per lo tant podem concluir que amb el valor òptim de k que és 3, el model knn està molt ben ajustat. 
+S'observa que els valors més grans de Kappa (0.8029506) i d'accuracy (0.8897802) estan amb la k=3, per tant podem concloure que amb el valor òptim de k que és 3, el model knn està molt ben ajustat.
 
 
 A l'assignatura d'anàlisi multivariant hem estudiat com es representa gràficaemnt la validació d'aquest mètode: 
@@ -310,12 +312,11 @@ A l'assignatura d'anàlisi multivariant hem estudiat com es representa gràficae
 plot(model_knn, main = "Optimització de K", 
      pch = 19, col = "steelblue")
 ```
-S'observa que el punt més alt de la corba es troba en k=3, aquest confirma que amb tres veïns el model assoleix el seu màxim rendiment abans de començar a decaure (ja sigui per excés de soroll o per suavitzar massa les dades). 
+S'observa que el punt més alt de la corba es troba en k=3, aquest confirma que amb tres veïns el model assoleix el seu màxim rendiment abans de començar a decaure (ja sigui per excés de soroll o per suavitzar massa les dades).
 
+És interessant estudiar també que a partir de projectar les dades (les de test) en un pla (l'he creat a partir dels dos gens més variables), podem veure com ha classificat el mètode de KNN les noves mostres.
 
-És interessant estudiar també que a partir de projectar les dades (les de test) en un pla (l'he creat a partir dels dos gens més variables), podem veure com ha classificat les el mètode de KNN les noves mostres. 
-
-Per projectar les dades en 2D, hem escollit els gens STC2 i APOD atès que, com s'ha vist a l'anàlisi exploratori prèvi, són els que presenten la variància més alta. 
+Per projectar les dades en 2D, hem escollit els gens STC2 i APOD atès que, com s'ha vist a l'anàlisi exploratori previ, són els que presenten la variància més alta.
 
 
 ```{r}
@@ -348,12 +349,12 @@ ggplot(resultats_vis, aes(x = G1, y = G2, color = Prediccio, shape = Correcte)) 
   theme_minimal()
 ```
 
-Aquest gràfic format per l'expressió del gen STC2 en l'eix x i el gen APOD en l'eix y, representa per colors a quina classe de subtipus de càncer pertany cada mostra (basant-nos en els 3 veïns més propers de les dades d'entrenament). 
-El rosa és de subtipus Basal, tendeix a agrupar-se en la part esquerra (valors més baixos de STC2). El verd representa Her2 i, el blau LumA que es troben en la part dreta de STC2. 
+Aquest gràfic format per l'expressió del gen STC2 en l'eix x i el gen APOD en l'eix y, representa per colors a quina classe de subtipus de càncer pertany cada mostra (basant-nos en els 3 veïns més propers de les dades d'entrenament).
+El rosa és de subtipus Basal, tendeix a agrupar-se en la part esquerra (valors més baixos de STC2). El verd representa Her2 i el blau LumA, que es troben en la part dreta de STC2.
 
-La gran majoria de elements que hi ha en el gràfic són cercles, fet que reflecteix que és un model amb molts encerts amb la realitat. Les poques creus que hi han es troben en les fronteres de decisió, així que és normal que en aquelles zones el model falli ocasionalment. 
+La gran majoria d'elements que hi ha en el gràfic són cercles, fet que reflecteix que és un model amb molts encerts respecte a la realitat. Les poques creus que hi ha es troben principalment en les fronteres de decisió. Cal tenir en compte que el model s'ha entrenat tenint en compte 200 gens (un espai de 200 dimensions), de manera que aquest gràfic només n'és una projecció en 2D; és normal que visualment en aquest pla algunes creus semblin barrejades.
 
-Per a una millor explicació, representarem ara el mateix gràfic, però amb les diferentes k's. 
+Per a una millor explicació, representarem ara el mateix gràfic, però amb les diferents k's.
 
 ```{r}
 gen1 <- "STC2"
@@ -400,12 +401,11 @@ for(i in seq_along(k_valors)) {
 grid.arrange(grobs = llista_grafics, ncol = 2, 
              top = "Comparació del test segons les diferentes K's")
 ```
-El fet de que hi hagin més creus en aquests 4 gràfics en comparació amb l'anterior indica que hi han més errors de classificació (el model tendeix a euivocar-se més que no pas amb la k òptima).
+El fet que hi hagi més creus en aquests 4 gràfics en comparació amb l'anterior indica que hi ha més errors de classificació (el model tendeix a equivocar-se més que no pas amb la k òptima).
 
-Troben que amb el k=1, fa que el model sigui més sensible als outliers de l'entrenament i, en canvi, amb els k=5,7,11 fa que es torni massa conservador a causa d'un sobreajust. 
+Trobem que amb k=1 el model pateix de sobreajust, sent massa sensible al soroll i als outliers de l'entrenament. En canvi, amb k=5, 7 i 11 el model es torna massa conservador a causa d'un subajust, ja que suavitza massa les fronteres de decisió.
 
-Amb aquestes evidències visuals, queda clar que k=3 és un equilibri ideal entre precisió i capacitat de generalització per a aquestes dades òmiques. 
-
+Amb aquestes evidències visuals, queda clar que k=3 és un equilibri ideal entre precisió i capacitat de generalització per a aquestes dades òmiques.
 
 
 ## 2. Classificació amb Support Vector Machine
