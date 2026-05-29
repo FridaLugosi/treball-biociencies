@@ -143,24 +143,12 @@ S'observa que hi ha diferències entre els tres subtipus en les dues primeres di
 
 Per garantir la comparabilitat entre models, tots els algoritmes s'entrenen i s'avaluen emprant exactament la mateixa partició de train i test. D'acord amb les indicacions de l'enunciat, s'utilitza una llavor fixa per garantir la reproductibilitat dels resultats. 
 
-```{r}
-set.seed(params$seed)
-
-n <- nrow(dades)
-train_idx <- sample(1:n,size=round(0.67 * n))
-
-data.train <- dades[train_idx,]
-data.test <- dades[-train_idx,]
-
-#######################AQUEST CHUNK S'HA D'ESBORRAR###########################
-#PERÒ SI S'ESBORRA NO RUNEJA RES DE kNN
-```
 
 ```{r}
 set.seed(params$seed)
 p <- 0.67
 n <- nrow(dadesX)
-training <- sample(1:n,p*nrow(dadesX))
+training <- sample(1:n, p*nrow(dadesX))
 
 
 xtrain <- dadesX[training,]
@@ -199,8 +187,8 @@ Ara s'entrena el model KNN usant la variable Y com a resposta i tota la resta co
 
 ```{r}
 set.seed(params$seed)
-model_knn <- train(Y ~ ., 
-                   data = data.train, 
+model_knn <- train(ytrain ~ ., 
+                   data = mydata, 
                    method = "knn", 
                    trControl = ctrl, 
                    tuneGrid = valors_k,
@@ -279,8 +267,8 @@ for(i in seq_along(k_valors)) {
   k_actual <- k_valors[i]
 
   set.seed(params$seed)
-  model_temp <- train(Y ~ ., 
-                      data = data.train, 
+  model_temp <- train(ytrain ~ ., 
+                      data = mydata, 
                       method = "knn", 
                       tuneGrid = data.frame(k = k_actual),
                       preProcess = c("center", "scale"),
@@ -402,17 +390,81 @@ S'observa en els dos models que Basal s'infradetecta i Her2 es sobredetecta. Aix
 ```{r}
 # algorisme knn
 pred_knn <- predict(model_knn, newdata = xtest)
-confusionMatrix(pred_knn, ytest)
+confusionMatrix(pred_knn, reference = as.factor(ytest))
 
 # algorisme SVM kernel lineal
 pred_lineal <- predict(modelo_svm_lineal, newdata = xtest)
-confusionMatrix(pred_lineal, ytest)
+confusionMatrix(pred_lineal, reference = as.factor(ytest))
 
 # algorisme SVM rbf
 pred_rbf <- predict(modelo_svm_rbf, newdata = xtest)
-confusionMatrix(pred_rbf, ytest)
+confusionMatrix(pred_rbf, reference = as.factor(ytest))
 ```
 
+```{r}
+pred_knn <- predict(model_knn, newdata = xtest)
+pred_lineal <- predict(modelo_svm_lineal, newdata = xtest)
+pred_rbf <- predict(modelo_svm_rbf, newdata = xtest)
+
+cm_knn <- confusionMatrix(pred_knn, ytest)
+cm_lin <- confusionMatrix(pred_lineal, ytest)
+cm_rbf <- confusionMatrix(pred_rbf, ytest)
+
+taula1 <- list("k-NN (k=3)" = cm_knn$table, "SVM Lineal" = cm_lin$table, "SVM Radial" = cm_rbf$table)
+
+taula1
+```
+
+
+
+```{r}
+# Funció auxiliar per extreure l'interval de confiança com a text net
+IC <- function(cm) {
+  paste0("(", round(cm$overall["AccuracyLower"], 4), ", ", round(cm$overall["AccuracyUpper"], 4), ")")
+}
+
+taula2 <- data.frame(
+  `Estadístic Global` = c("Accuracy (Precisió Global)", "95% CI (Interval de Confiança)", "No Information Rate (NIR)", "P-Value [Acc > NIR]", "Kappa"),
+  "k-NN (k=3)" = c(
+    round(cm_knn$overall["Accuracy"], 4),
+    IC(cm_knn),
+    round(cm_knn$overall["AccuracyNull"], 4),
+    format.pval(cm_knn$overall["AccuracyPValue"], digits = 4),
+    round(cm_knn$overall["Kappa"], 4)),
+  "SVM Lineal" = c(
+    round(cm_lin$overall["Accuracy"], 4),
+    IC(cm_lin),
+    round(cm_lin$overall["AccuracyNull"], 4),
+    format.pval(cm_lin$overall["AccuracyPValue"], digits = 4),
+    round(cm_lin$overall["Kappa"], 4)),
+  "SVM Radial" = c(
+    round(cm_rbf$overall["Accuracy"], 4),
+    IC(cm_rbf),
+    round(cm_rbf$overall["AccuracyNull"], 4),
+    format.pval(cm_rbf$overall["AccuracyPValue"], digits = 4),
+    round(cm_rbf$overall["Kappa"], 4)),
+  check.names = FALSE)
+
+kable(taula2, caption = "Estadístiques Generals Comparatives sobre el conjunt Test", align = c("l", "c", "c", "c"))
+
+
+## comentar McnemarPValue = NA
+```
+
+```{r}
+# Vector de mètriques per classe que volem extreure
+metriques <- c("Sensitivity", "Specificity", "Pos Pred Value", "Neg Pred Value", "Prevalence", "Detection Rate", "Detection Prevalence", "Balanced Accuracy")
+
+taula3 <- data.frame(
+  Mètrica = rep(metriques, each = 3),
+  Classe  = rep(c("Basal", "Her2", "LumA"), length(metriques)),
+  "k-NN (k=3)" = c(t(cm_knn$byClass[, metriques])),
+  "SVM Lineal" = c(t(cm_lin$byClass[, metriques])),
+  "SVM Radial" = c(t(cm_rbf$byClass[, metriques])),
+  check.names = FALSE)
+
+kable(taula3, caption = "Mètriques d'Avaluació Detallades i Comparatives per Subtipus Biològic", digits = 4, align = c("l", "c", "c", "c", "c"))
+```
 
 
 
