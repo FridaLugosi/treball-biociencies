@@ -335,17 +335,9 @@ plot(modelo_svm_lineal, xlim=c(-10,100))
 ```
 S'observa que per quasi bé tots els valors de C tenen la Accuracy amb el mateix valor i com que aquest és proper a 1 indica que es té un model molt estable i fàcilment separable linealment. També s'observa un coeficient Kappa alt el qual desconta l'atzar i per tant es confirma que és un bon model. Finalment es mostra que el valor ideal de C és 0.03125, el qual és el més petit, ja que s'aplica el principi de parsimònia que és que el model simple ja funciona perfectament.
 
-Amb el gráfic es recolzen les conclusions obtenides abans, el pic del 94% indica que exsisteix un calor de cost òptim molt concret que aconsegueix el millor equilibri
+Amb el gráfic es recolzen les conclusions obtenides abans, un Accuracy del 92.29% i un coeficient Kappa del 0.8798438 i es mostra que els diferents valors de C tenen el mateix valor d'Accuracy i Kappa. S'escull un valor petit de C perquè impliquen una major regularització i un evita el sobreajust.
 
 Un cop el model està definit es prediuen les dades amb les que s'han separat expressament per testejar. I s'evaluen els resultats de la predicció amb la matriu de confusió. Aquesta el que fa és calcular la sentistivty, specificity, precision...
-
-```{r}
-pred_lineal <- predict(modelo_svm_lineal, xtest)
-
-confusionMatrix(pred_lineal, ytest)
-```
-La matriu de confusió retorna una accuracy del 0.94 i un kappa, que és l'ajust per atzar, del 0.9, aquests valors són molt bons.
-Pel que fa a les classes, el model classifica perfectament (sensitivity = 1 ) la classe LumA, mentre que es detecten petites confusions entre les classes Basal i Her2 que es poden observar en les prediccions. En la matriu de confusió es recalquen aquests petits errors en les columnes de `sensitivity` i `specificity.` Si comparem la prevalença real (`Prevalence`) amb la prevalença de predicció del model (`Detection Prevalence`), podem veure que el model tendeix a infradetectar lleugerament la categoria Basal, mentre que sobreprediu en les categories Her2 i LumA, assignant-los un percentatge de casos una mica superior al que hi ha a la mostra real.
 
 En conclusió, el model amb la funció kernel lineal està molt ben ajustat, igualment, es provarà amb la funció kernel rbf ja que aquest pot millorar o sobreajustar.
 
@@ -364,23 +356,10 @@ modelo_svm_rbf
 
 plot(modelo_svm_rbf)
 ```
-A partir dels resultats del model mostra que ,moltes combinacions de C i sigma donen una accuracy propera a 0.52 i un Kappa igual a 0, indicant que el model és molt sensible a aquests paràmetres. Els quals són valors molt més petits que el lineal. Però es troba que la millor combinació és sigma 0.0009765625 i c=4 on tenen un 94.06% d'accuracy i un Kappa de 0.90, que és un rendiment molt alt.
+A partir dels resultats del model mostra que, moltes combinacions de C i sigma donen una accuracy propera a 0.54 i un Kappa igual a 0, indicant que el model és molt sensible a aquests paràmetres. Els quals són valors molt més petits que el lineal. Però es troba que la millor combinació és sigma 0.0009765625 i C=2 on s'obté un 93.97% d'accuracy i un Kappa de 0.894, que és un rendiment molt alt.
 
 Amb el gráfic el es comparen els diferents valors de C amb els diferents valors de sigma i s'observa que una sigma petita, proper a 0, té un Accuracy més alt.
 
-```{r}
-pred_rbf <- predict(modelo_svm_rbf, xtest)
-
-confusionMatrix(pred_rbf, ytest)
-```
-
-Amb la predicció i la matriu de confusió aplicada en aquesta es mostra que el model presenta un rendiment molt elevat, amb una accuracy del 94% i un valor de Kappa de 0.90, indicant una classificació molt bona. El model és significativament millor que un classificador aleatori (NIR = 0.46). Pel que fa a les classes, LumA es classifica perfectament (Sensitivity = 1 ), mentre que es mostren  petites confusions a les categories Basal i Her2. Les mètriques de sensibilitat, especificitat i balanced accuracy confirmen la robustesa del model. Més específicament matriu de confusió retorna que el model infradetecta la categoria basal, i sobredetecta la Her2 i la LumA, molt semblant als resultats obtinguts amb el kernel lineal.
-
-
-
-En conclusió, encara que el kernel RBF és més flexible, no millora el rendiment respecte el model lineal. RBF no empitjora sino que no aporta cap millora. Llavors pel principi de parsimònia s'escull el model més simple, per tant, el lineal. Cal destacar que el model lineal és molt constant i per tant funciona bé sempre i que el RBF només funciona bé en una zona concreta, en altres zones té un accuracy proper al 52%.
-
-S'observa en els dos models que Basal s'infradetecta i Her2 es sobredetecta. Això suggereix que hi ha similitud biològica real entre Basal i Her2 que val la pena explorar en estudis posteriors.
 
 
 ## Comparativa d'algorismes
