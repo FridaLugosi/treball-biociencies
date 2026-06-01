@@ -405,9 +405,9 @@ kable(taula3, caption = "Mètriques d'Avaluació Detallades i Comparatives per S
 
 ### Corba ROC i l’àrea sota la corba (AUC)
 
-En aquest punt s'ajusten els classificadors utilitzats en els apartats anteriors per discriminar les classes Basal i Her2. Després, s'obtenen les diferents corbes ROC i les magnituds AUC de cada model en el conjunt test.
+En aquest punt s'ajusten els classificadors utilitzats en els apartats anteriors per discriminar entre les classes Basal i Her2. Després, s'obtenen les corbes ROC i les magnituds AUC de cada model en el conjunt test.
 
-La corba ROC (Receiver Operating Characteristic) representa la taxa de veritables positius (càncers Basal que s'han detectat correctament) i la taxa de falsos positius (càncers Her2 que s'han detectat erròneament com a Basal) en funció dels diferents llindars. Els seus punts crítics són els següents:
+La corba ROC (Receiver Operating Characteristic) representa la taxa de veritables positius (càncers Basal que s'han detectat correctament) en l'eix Y i la taxa de falsos positius (càncers Her2 que s'han detectat erròniament com a Basal) en l'eix X, les dues en funció dels diferents llindars. Els seus punts crítics són els següents:
 
 * `(0, 0)`: Representa l'estratègia consistent en classificar tots els casos com a Basal.
 
@@ -415,57 +415,74 @@ La corba ROC (Receiver Operating Characteristic) representa la taxa de veritable
 
 * `(1, 1)`: Representa l'estratègia consistent en classificar tots els casos com a Her2.
 
-Per poder comparar classificadors, es redueix el rendiment de la corba ROC a un únic escalar. Per fer-ho, s'acotuma a utilitzar l'AUC (Area Under the Curve), que representa l'àrea sota la corba. Aquest valor té una propietat matemàtica important: és l'equivalent a dur a terme el test dels rangs signats de Wilcoxon. Així, el seu valor també es pot interpretar com la probabilitat de que el model hagi donat una probabilitat més alta a un càncer Basal que a un càncer Her2.
+Per poder comparar classificadors, es redueix el rendiment de la corba ROC a un únic escalar. Per fer-ho, s'acostuma a utilitzar l'AUC (Area Under the Curve), que representa l'àrea sota la corba. Aquest valor té una propietat matemàtica important: és l'equivalent a dur a terme el test dels rangs signats de Wilcoxon. Així, el seu valor també es pot interpretar com la probabilitat que el model hagi donat una puntuació més alta a un càncer Basal que a un càncer Her2.
 
-Per a que un model sigui millor que l'atzar, s'ha de situar per sobre de la diagonal traçada des de (0, 0) a (1, 1). O, dit d'una altra manera, ha de tenir un AUC superior a 0,5.
+Perquè un model sigui millor que l'atzar, s'ha de situar per sobre de la diagonal traçada des de (0, 0) a (1, 1). Dit d'una altra manera, ha de tenir un AUC superior a 0,5.
 
 Per poder comparar els apartats es procedirà de la següent manera:
 
-1.  Parametrització òptima.
-2.  Eliminació de les dades de la classe LumA de les bases de dades train i test.
-3.  Execució dels models.
+1.  Emmagatzematge dels paràmetres òptims dels models utilitzats amb anterioritat.
+
+2.  Eliminació de les observacions de la classe LumA de les bases de dades que es faran servir.
+
+3.  Execució dels models amb parametrització òptima. Creació i interpretació de les matrius de confusió.
+
 4.  Càlcul de la corba ROC i la magnitud AUC de cada model.
+
 5.  Valoració dels resultats.
 
+
 ```{r}
-# Parametrització òptima
+# Emmagatzematge dels paràmetres òptims dels models utilitzats amb anterioritat.
 k_knn <- model_knn$bestTune[[1]]
 c_lineal <- modelo_svm_lineal$bestTune[[1]]
 sigma_rbf <- modelo_svm_rbf$bestTune[[1]]
 c_rbf <- modelo_svm_rbf$bestTune[[2]]
 
-# Eliminació de les dades de la classe LumA de les bases de dades train i test
-## Train
+# Eliminació de les observacions de la classe LumA de les bases de dades que s'utilitzaran.
+## Base de dades train
 dades_bin_train <- data.frame(Y = ytrain, xtrain)[ytrain %in% c("Basal", "Her2"), ]
 xtrain_bin <- dades_bin_train[,-1]
 ytrain_bin <- droplevels(dades_bin_train$Y)
 mydata_bin <- data.frame(ytrain_bin, xtrain_bin)
-## Test
+## Base de dades test
 dades_bin_test  <- data.frame(Y = ytest, xtest)[ytest %in% c("Basal", "Her2"), ]
 xtest_bin <- dades_bin_test[,-1]
 ytest_bin <- droplevels(dades_bin_test$Y)
 
-# Model KNN binari amb parametrització òptima
+# Execució dels models models amb parametrització òptima.
+## Model KNN binari amb parametrització òptima
 ctrl_bin <- trainControl(method = "none", classProbs = TRUE)
 knn_model_bin <- train(x = xtrain_bin, y = ytrain_bin, method = "knn", 
                        tuneGrid = data.frame(k = k_knn), trControl = ctrl_bin)
 knn_pred <- predict(knn_model_bin, newdata = xtest_bin)
 confusionMatrix(knn_pred, ytest_bin)
-
-# Model SVM lineal binari amb parametrització òptima
+## Model SVM lineal binari amb parametrització òptima
 svm_lineal_bin <- train(x = xtrain_bin, y = ytrain_bin, method = "svmLinear", 
                         tuneGrid = data.frame(C = c_lineal), trControl = ctrl_bin)
 svm_lineal_predict <- predict(svm_lineal_bin, newdata = xtest_bin)
 confusionMatrix(svm_lineal_predict, ytest_bin)
-
-# Model SVM lineal binari amb parametrització òptima
+## Model SVM lineal binari amb parametrització òptima
 svm_radial_bin <- train(x = xtrain_bin, y = ytrain_bin, method = "svmRadial", 
                         tuneGrid = data.frame(sigma = sigma_rbf, C = c_rbf), 
                         trControl = ctrl_bin)
 svm_radial_predict <- predict(svm_radial_bin, newdata = xtest_bin)
 confusionMatrix(svm_radial_predict, ytest_bin)
+```
 
-# Corba ROC i l'AUC del model KNN
+
+S'observa el següent:
+
+-   El model K-NN té una precisió (*Accuracy*) del 86,21%. És a dir, que ha emès 4 classificacions errònies. D'aquestes, 3 són falsos positius (el model prediu càncer Basal quan en realitat és Her2) i 1 és fals negatiu (el model prediu càncer Her2 quan en realitat és Basal).
+
+-   El model SVM lineal té una precisió del 95,55%. Només ha emès un fals positiu.
+
+-   El model SVM radial té una precisió del 100%. És a dir, que ha classificat totes les observacions del conjunt de prova correctament.
+
+
+```{r}
+# Càlcul de la corba ROC i la magnitud AUC de cada model.
+## Corba ROC i l'AUC del model KNN
 knn_prob <- predict(knn_model_bin, newdata = xtest_bin, type = "prob")
 prob1_knn <- knn_prob$Her2
 pred_knn <- ROCR::prediction(predictions = prob1_knn, labels = as.factor(ytest_bin), label.ordering = c("Basal", "Her2"))
@@ -473,8 +490,7 @@ perf_knn <- performance(pred_knn, "tpr", "fpr")
 perf.auc_knn <- unlist(performance(pred_knn, measure="auc")@y.values)
 plot(perf_knn, avg= "threshold", lwd=3, colorize=F, main = paste("KNN amb k =", k_knn, ", ROC curve, AUC =", round(perf.auc_knn,4)))
 abline(a = 0, b = 1, lwd = 1, lty = 2)
-
-# Corba ROC i l'AUC del model SVM lineal
+## Corba ROC i l'AUC del model SVM lineal
 svm_prob <- predict(svm_lineal_bin, newdata = xtest_bin, type = "prob")
 prob1_svm <- svm_prob$Her2
 pred_svm <- ROCR::prediction(predictions = prob1_svm, labels = as.factor(ytest_bin), label.ordering = c("Basal", "Her2"))
@@ -482,8 +498,7 @@ perf_svm <- performance(pred_svm, "tpr", "fpr")
 perf.auc_svm <- unlist(performance(pred_svm, measure="auc")@y.values)
 plot(perf_svm, avg= "threshold", lwd=3, colorize=F, main = paste("SVM lineal amb C =", c_lineal, ", ROC curve, AUC =", round(perf.auc_svm, 4)))
 abline(a = 0, b = 1, lwd = 1, lty = 2)
-
-# Corba ROC i l'AUC del model SVM radial
+## Corba ROC i l'AUC del model SVM radial
 svm_radial_prob <- predict(svm_radial_bin, newdata = xtest_bin, type = "prob")
 prob1_svm_radial <- svm_radial_prob$Her2
 pred_svm_radial <- ROCR::prediction(predictions = prob1_svm_radial, 
@@ -492,12 +507,22 @@ pred_svm_radial <- ROCR::prediction(predictions = prob1_svm_radial,
 perf_svm_radial <- performance(pred_svm_radial, "tpr", "fpr")
 perf.auc_svm_radial <- unlist(performance(pred_svm_radial, measure="auc")@y.values)
 plot(perf_svm_radial, avg= "threshold", lwd=3, colorize=F, 
-     main = paste("SVM radial amb C=", round(c_rbf, 3), "i , sigma=", round(sigma_rbf, 3), "\nROC curve, AUC =", round(perf.auc_svm_radial, 4)))
+     main = paste("SVM radial amb C=", round(c_rbf, 3), "i sigma=", round(sigma_rbf, 3), "\nROC curve, AUC =", round(perf.auc_svm_radial, 4)))
 abline(a = 0, b = 1, lwd = 1, lty = 2)
 ```
 
 
+S'observa el següent:
+
+-   El model K-NN té un AUC = `r round(perf.auc_svm_radial, 4)`. Això vol dir que en el conjunt de prova, el 97,14% de les vegades el model ha assignat als càncers de tipus Basal una puntuació més alta que als càncers de tipus Her2.
+
+-   Els models de SVM (tant lineal com radial) tenen un AUC = 1. Això vol dir que en el conjunt de prova, el model ha assignat a tots els càncers de tipus Basal una puntuació més alta que als càncers de tipus Her2.
+
+Així, per criteri de Parsimònia (per rendiments similars, millor triar el model més simple) el millor algorisme és el SVM lineal.
+
+
 # DISCUSSIÓ 
+
 Pel que fa al k-NN, s'ha determinat que el paràmetre k=3 és l'òptim, ja que maximitza la capacitat predictiva evitant problemes de sobreajust.
 
 En comparar els mètodes, el SVM amb kernel lineal ha resultat ser clarament superior, superant el k-NN i el SVM radial. L'absència de millora amb el model radial demostra que, en 'espai d'alta dimensió, els patrons d'expressió ja són perfectament separables de forma lineal.
