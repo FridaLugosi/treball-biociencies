@@ -531,7 +531,7 @@ abline(a = 0, b = 1, lwd = 1, lty = 2)
 
 S'observa el següent:
 
--   El model K-NN té un AUC = `r round(perf.auc_svm_radial, 4)`. Això vol dir que en el conjunt de prova, el 97,14% de les vegades el model ha assignat als càncers de tipus Basal una puntuació més alta que als càncers de tipus Her2.
+-   El model K-NN té un AUC = `r round(perf.auc_knn,4)`. Això vol dir que en el conjunt de prova, el 97,14% de les vegades el model ha assignat als càncers de tipus Basal una puntuació més alta que als càncers de tipus Her2.
 
 -   Els models de SVM (tant lineal com radial) tenen un AUC = 1. Això vol dir que en el conjunt de prova, el model ha assignat a tots els càncers de tipus Basal una puntuació més alta que als càncers de tipus Her2.
 
