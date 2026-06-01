@@ -1,6 +1,6 @@
 ---
 title: "Treball Bio"
-author: "Iris Arevalo, Vinyet Hernan, Ernest Juncosa, Dongjun Li i Frida Lugosi"
+author: "Iris Arevalo, Vinyet Hernan Juanati, Ernest Juncosa, Dongjun Li i Frida Lugosi"
 date: "2026-05-01"
 output:
   html_document: default
@@ -21,7 +21,7 @@ knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_chunk$set(error = TRUE)
 ```
 
-```{r}
+```{r, include=FALSE}
 library(ggplot2)
 library(factoextra)
 library(pheatmap)
