@@ -9,7 +9,7 @@ output:
     toc_depth: 4
 lang: ca
 params:
-  mypath_in: "/Users/vinyethernan/ESTADÍSTICA/BIOCIENCIES/Treball/"
+  mypath_in: input/
   mypath_out: output
   bbdd: rna
   seed: 123
@@ -50,7 +50,7 @@ A partir d'aquesta informació, s'entrenaran dos algorismes de classificació su
 
 A continuació es farà una petita inspecció de les dades. També es descriuran els mètodes utilitzats en l'anàlisi.
 
-## Anàlisi exploratori de les dades
+## Anàlisi exploratòria de les dades
 
 Per poder dur a terme l'anàlisi, es farà una avaluació de les dades.
 
@@ -137,9 +137,9 @@ S'observa que tots els gens presenten valors d'expressió molt similars entre si
 
 ### Reducció de dimensionalitat i exploració de les mostres
 
-Una tècnica fonamental en l'anàlisi exploratori de les dades òmiques és fer PCA (Anàlisi de Components Principals) sobre totes les variables predictores. És un mètode molt útil per reduir la dimensionalitat del conjunt de dades i permet visualitzar possibles patrons de separació entre classes. Consisteix en transformar les variables originals en un conjunt reduït de components ortogonals que expliquen la major part de la variabilitat total del conjunt de dades. Així, permet una representació visual més senzilla i facilita la identificació de possibles agrupacions naturals entre mostres. 
+Una tècnica fonamental en l'anàlisi exploratòria de les dades òmiques és fer PCA (Anàlisi de Components Principals) sobre totes les variables predictores. És un mètode molt útil per reduir la dimensionalitat del conjunt de dades i permet visualitzar possibles patrons de separació entre classes. Consisteix a transformar les variables originals en un conjunt reduït de components ortogonals que expliquen la major part de la variabilitat total del conjunt de dades. Així, permet una representació visual més senzilla i facilita la identificació de possibles agrupacions naturals entre mostres. 
 
-És important emfatitzar que el PCA que es presenta a continuació té un propòsit exclusivament exploratori. L'objectiu és visualitzar com es distribueixen les mostres en funció del seu subtipus tumoral abans de qualsevol modelització. En cap cas s'utilitzen aquests resultats per entrenar els models de classificació. Si en un futur es volgués utilitzar PCA com a mètode de reducció de dimensionalitat, seria necessari calcular els components principals únicament amb les dades d'entrenament.
+És important emfatitzar que el PCA que es presenta a continuació té un propòsit exclusivament exploratori. L'objectiu és visualitzar com es distribueixen les mostres en funció del seu subtipus tumoral abans de qualsevol modelització. En cap cas s'utilitzen aquests resultats per entrenar els models de classificació. Si en un futur es volgués fer servir PCA com a mètode de reducció de dimensionalitat, seria necessari calcular els components principals únicament amb les dades d'entrenament.
 
 ```{r}
 pca <- prcomp(dadesX, scale. = TRUE)
@@ -211,7 +211,7 @@ En aquest apartat s'entrenaran els algorismes utilitzant totes les mostres dispo
 
 ### Classificació amb k-Nearest Neighbours
 
-El mètode de **K-Nearest Neighbour (KNN)** consisteix en crear una nova mostra (desconeguda) per observar la classe pertinent de les mostres veïnes; és a dir, aquelles que són més properes a ella en l'espai de dades. 
+El mètode de **K-Nearest Neighbour (KNN)** consisteix a crear una nova mostra (desconeguda) per observar la classe pertinent de les mostres veïnes; és a dir, aquelles que són més properes a ella en l'espai de dades. 
 
 Amb la següent funció s'aplica aquest mètode, es calcula la distància euclidiana d'un punt cap als seus "k" veïns més propers a partir dels nivells d'expressió dels gens (que actuen en aquest cas com variables predictores). Finalment, s'assigna la classe majoritària entre els k veïns a la nova mostra.
 
@@ -223,7 +223,7 @@ ctrl <- trainControl(method = "cv", number = 3)
 valors_k <- expand.grid(k = c(1, 3, 5, 7, 11))
 ```
 
-Ara s'entrena el model KNN usant la variable Y com a resposta i tota la resta com a predictors. S' estandaritzen les dades perquè KNN es basa en distàncies i es sap que és molt sensible a l'escala de les pròpies dades per a calcular-les.  
+Ara s'entrena el model KNN usant la variable Y com a resposta i tota la resta com a predictors. S'estandaritzen les dades perquè KNN es basa en distàncies i se sap que és molt sensible a l'escala de les mateixes dades per a calcular-les.  
 
 ```{r}
 # Llavor
@@ -242,7 +242,7 @@ En els resultats obtinguts en aquesta taula s'observa que s'han utilitzat 100 mo
 
 Aquesta explica que els grups de validació (3 fold) han tingut mides de 67, 67 i 66 mostres.
 
-Tot i que en casos de classes desequilibrades pot ser útil la mètrica de Kappa (ja que mesura la concordança entre les prediccions del model i la realitat), l'output ens mostra que el model ha utilitzat per defecte la columna d'accuracy per a seleccionar el model òptim. Aquesta mètrica explica quant encerta el model en les classificacions durant la validació creuada.
+Tot i que en casos de classes desequilibrades pot ser útil la mètrica de Kappa (ja que mesura la concordança entre les prediccions del model i la realitat), l'output ens mostra que el model ha utilitzat per defecte la columna d'accuracy per a seleccionar el model òptim. Aquesta mètrica explica quan encerta el model en les classificacions durant la validació creuada.
 
 S'observa que la màxima precisió (accuracy = 0.8897802) s'assoleix de manera idèntica tant amb k=1 com amb k=3. Tot i aquest empat, es conclou que el valor òptim és k=3, ja que presenta un coeficient Kappa lleugeríssimament superior (0.8029506 davant 0.8029408). A part això evita el risc de sobreajust que suposaria classificar les mostres basant-se en un únic veí.
 
@@ -260,7 +260,7 @@ Com es pot observar, k=1 i k=3 tenen la mateixa precisió. Aquest fet ja era obs
 
 ### Classificació amb Support Vector Machine
 
-Primer de tot s'indica que es vol entrenar el model amb 3 fold-cross validation, això es fa indicant als paràmetres el mètode "cv" (cross-validation) i com que es volen 3 folds, number 3. Amb els folds el que es consegueix és dividir les dades en 3 parts iguals on es fan tres iteracions. S'entrena amb dos folds i es valida amb el que resta. Amb aquest mètode s'utilitzen millor les dades ja que, com que es tenen molts gens en el data-set no es pot permetre perdre dades.
+Primer de tot s'indica que es vol entrenar el model amb 3 fold-cross validation, això es fa indicant als paràmetres el mètode "cv" (cross-validation) i com que es volen 3 folds, number 3. Amb els folds el que s'aconsegueix és dividir les dades en 3 parts iguals on es fan tres iteracions. S'entrena amb dos folds i es valida amb el que resta. Amb aquest mètode s'utilitzen millor les dades, ja que, com que es tenen molts gens en la base de dades no es pot permetre observacions.
 
 ```{r}
 # Mètode d'entrenament del 3-fold cv (validació creuada)
@@ -269,15 +269,15 @@ control <- trainControl(method = "cv", number = 3)
 
 Un cop definit la manera d'entrenar el model, s'aplica aquest, es començarà a aplicar el SVM, aquest algorisme busca separar classes amb un hiperplà óptim, en el cas d'aquest treball, es busca distingir els diferents tipus de mostres biològiques.
 
-Lo bo d'aquest algorisme és que segueix sent efectiu en els casos on p>n.
+La cosa bona d'aquest algorisme és que continua sent efectiu en els casos on p>n.
 
-Com que l’objectiu d’aquest algorisme és separar les classes mitjançant una frontera de decisió lineal, en el cas de dades en més de dues dimensions, com aquest treball en particular on es té `ncol(dades)=201`, el conjunt té 200 predictors, ja que la columna Y és la variable resposta i no compta com a predictor, i per tant aquesta frontera será un hiperplà. Aquesta frontera possiblement no será lineal i per això s'usen les funcions kernel, que permeten transformar les dades a un espai de major dimensió on poden ser separades linealment.
+Com que l’objectiu d’aquest algorisme és separar les classes mitjançant una frontera de decisió lineal, en el cas de dades en més de dues dimensions, com aquest treball en particular on es té `ncol(dades)=201`, el conjunt té 200 predictors, ja que la columna Y és la variable resposta i no compta com a predictor, i per tant aquesta frontera serà un hiperplà. Aquesta frontera possiblement no serà lineal i per això s'usen les funcions kernel, que permeten transformar les dades a un espai de dimensió més alta on poden ser separades linealment.
 
 En primer lloc, s’explora el kernel lineal, que no aplica cap transformació i genera fronteres de decisió lineals.
 
 #### Kernel lineal
 
-S'entrena el model amb la formula del model, utilitzant totes les variables, s'utilitzen les dades que han sigut expressament separades per entrenar el model amb el tractament de control `trControl` establert abans (3 fold-cross validation). S'aplica `svmLinear`, que és la funció kernel, com s'ha comentat anteriorment. És important escalar les variables en l'algorisme SVM, i per tant es fa un preprocessament `preProcess` on es centren i s'escalen. I finalment, es defineixen els valors dels paràmetres de l'hiperplà `tuneGrid=expand.grid()` on es van provant diferents valors fins trobar l'adequat.
+S'entrena el model amb la fórmula del model, utilitzant totes les variables, s'usen les dades que han sigut expressament separades per entrenar el model amb el tractament de control `trControl` establert abans (3 fold-cross validation). S'aplica `svmLinear`, que és la funció kernel, com s'ha comentat anteriorment. És important escalar les variables en l'algorisme SVM, i per tant es fa un preprocessament `preProcess` on es centren i s'escalen. I finalment, es defineixen els valors dels paràmetres de l'hiperplà `tuneGrid=expand.grid()` on es van provant diferents valors fins a trobar l'adequat.
 
 ```{r}
 # Llavor
@@ -289,17 +289,17 @@ plot(modelo_svm_lineal, xlim=c(-10,100))
 ```
 
 
-S'observa que per quasi bé tots els valors de C tenen la Accuracy amb el mateix valor i com que aquest és proper a 1 indica que es té un model molt estable i fàcilment separable linealment. També s'observa un coeficient Kappa alt el qual desconta l'atzar i per tant es confirma que és un bon model. Finalment es mostra que el valor ideal de C és 0.03125, el qual és el més petit, ja que s'aplica el principi de parsimònia que és que el model simple ja funciona perfectament.
+S'observa que per quasi tots els valors de C tenen la Accuracy amb el mateix valor i com que aquest és proper a 1 indica que es té un model molt estable i fàcilment separable linealment. També s'observa un coeficient Kappa alt el qual descompta l'atzar i, per tant, es confirma que és un bon model. Finalment, es mostra que el valor ideal de C és 0.03125, el qual és el més petit, ja que s'aplica el principi de parsimònia que és que el model simple ja funciona perfectament.
 
-Amb el gráfic es recolzen les conclusions obtenides abans, un Accuracy del 92.29% i un coeficient Kappa del 0.8798438 i es mostra que els diferents valors de C tenen el mateix valor d'Accuracy i Kappa. S'escull un valor petit de C perquè impliquen una major regularització i un evita el sobreajust.
+Amb el gráfic es recolzen les conclusions obtingudes abans, un Accuracy del 92.29% i un coeficient Kappa del 0.8798438 i es mostra que els diferents valors de C tenen el mateix valor d'Accuracy i Kappa. S'escull un valor petit de C perquè impliquen una regularització més elevada i un evita el sobreajust.
 
-Un cop el model està definit es prediuen les dades amb les que s'han separat expressament per testejar. I s'evaluen els resultats de la predicció amb la matriu de confusió. Aquesta el que fa és calcular la sentistivty, specificity, precision...
+Un cop el model està definit es prediuen les dades amb les quals s'han separat expressament per testejar. I s'avaluen els resultats de la predicció amb la matriu de confusió. Aquesta el que fa és calcular la sentistivty, specificity, precision...
 
-En conclusió, el model amb la funció kernel lineal està molt ben ajustat, igualment, es provarà amb la funció kernel rbf ja que aquest pot millorar o sobreajustar.
+En conclusió, el model amb la funció kernel lineal està molt ben ajustat, igualment, es provarà amb la funció kernel rbf, ja que aquest pot millorar o sobreajustar.
 
 #### Kernel rbf
 
-De forma similar al lineal, s'usen totes les variables regressores, s'utilitzen les dades separades per entrenar amb el tractament especificat al principi, s'escalen les dades com a preprocessament. El que canvia en aquest model és el mètode `svmRadial` i que en aquest es tenen dos paràmetres a ajustar, aquests són el `C` (que també estava en el model lineal) que és quant castigues equivocar-se, i `Sigma` que signfica com de recargolada pot ser la frontera que es crea. Per establir aquests paràmetres es fa una graella i prova amb els diferents.
+De forma similar al lineal, s'usen totes les variables explicatives, s'utilitzen les dades separades per entrenar amb el tractament especificat al principi, s'escalen les dades com a preprocessament. El que canvia en aquest model és el mètode `svmRadial` i que en aquest es tenen dos paràmetres a ajustar, aquests són el `C` (que també estava en el model lineal) que és quan castigues equivocar-se, i `Sigma` que signfica com de recargolada pot ser la frontera que es crea. Per establir aquests paràmetres es fa una graella i prova amb els diferents.
 
 ```{r}
 # Llavor
@@ -313,10 +313,10 @@ modelo_svm_rbf
 
 En els resultats del model s'observa que moltes combinacions de C i sigma donen una accuracy propera a 0.54 i un Kappa igual a 0, indicant que el model és molt sensible a aquests paràmetres. Els quals són valors molt més petits que el lineal. Però es troba que la millor combinació és sigma 0.0009765625 i C=2 on s'obté un 93.97% d'accuracy i un Kappa de 0.894, que és un rendiment molt alt.
 
-Amb el gráfic el es comparen els diferents valors de C amb els diferents valors de sigma i s'observa que una sigma petita, proper a 0, té un Accuracy més alt.
+Amb el gràfic es comparen els diferents valors de C amb els diferents valors de sigma i s'observa que una sigma petita, proper a 0, té un Accuracy més alt.
 
 
-### Matriu de confusió i metriques de qualitat
+### Matriu de confusió i mètriques de qualitat
 
 A partir dels valors òptims obtinguts de cada classificador, s'avaluen els tres mètodes sobre el conjunt de test de 50 mostres. La matriu de confusió permet avaluar de manera detallada com classifica cada algorisme i on es concentren els errors de predicció per a cada subtipus biològic:
 
@@ -445,7 +445,7 @@ kable(taula3, caption = "Mètriques d'Avaluació Detallades i Comparatives per S
 
 ## Classificació binària: Discriminació entre els subtipus Basal i Her2
 
-Per tal d'avaluar el rendiment predictiu en un entorn més acotat, en aquest apartat s'exclouen les mostres de la classe LumA. D'aquesta manera, el problema se simplifica i obliga als models a discriminar exclusivament entre els pacients amb tumors Basal i Her2. 
+Per tal d'avaluar el rendiment predictiu en un entorn més acotat, en aquest apartat s'exclouen les mostres de la classe LumA. D'aquesta manera, el problema se simplifica i obliga els models a discriminar exclusivament entre els pacients amb tumors Basal i Her2. 
 
 ### Execució dels models
 
