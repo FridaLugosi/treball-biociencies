@@ -1,27 +1,29 @@
 ---
-title: "Treball Bio"
-author: "Iris Arevalo, Vinyet Hernan Juanati, Ernest Juncosa, Dongjun Li i Frida Lugosi"
-date: "2026-05-01"
-output:
-  html_document: default
-  pdf_document: default
-toc: true
+title: "Classificació de subtipus de càncer de mama mitjançant algorismes d'aprenentatge automàtic"
+author: "Iris Arévalo, Vinyet Juanati Hernan, Ernest Juncosa, Dongjun Li i Frida Lugosi"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+    toc_depth: 4
 lang: ca
 params:
-  mypath_in: input/
+  mypath_in: "/Users/vinyethernan/ESTADÍSTICA/BIOCIENCIES/Treball/"
   mypath_out: output
   bbdd: rna
   seed: 123
-bibliography: ML2.bib
+bibliography: bibliografia.bib
+nocite: '@*'
 geometry: margin=2cm
 ---
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_chunk$set(error = TRUE)
 ```
 
-```{r, include=FALSE}
+```{r, message=FALSE}
+# Llibreries
 library(ggplot2)
 library(factoextra)
 library(pheatmap)
@@ -34,46 +36,60 @@ library(gridExtra)
 library(knitr)
 ```
 
+# Introducció i objectius
 
-# INTRODUCCIÓ i OBJECTIUS
+El càncer de mama és una malaltia altament heterogènia que presenta diferents subtipus moleculars amb característiques biològiques i clíniques diferenciades. Entre aquests subtipus, n'hi ha tres que són altament rellevants (Basal, Her2 i LumA). Ho són per la seva implicació en el pronòstic i en la resposta a l'hora d'escollir i dur a terme els tractaments. 
 
-El treball que s'ha escollit consisteix en un anàlisi d'un subconjunt de dades òmiques generades per *The Cancer Genome Atlas Network* (TCGA) corresponent a 150 mostres de tumors de mama prèviament normalitzades i filtrades. La primera columna del conjunt de dades indica el subtipus tumoral, mentre que la resta de columnes corresponen a l'expressió normalitzada de gens seleccionats. El treball és sobre el càncer de mama, que és una malaltia altament heterogènia que presenta diferents subtipus moleculars amb característiques biològiques i clíniques diferenciades. Entre aquests subtipus, n'hi ha tres que són altament rellevants (Basal, Her2 i LumA). Són especialment rellevants per la seva implicació en el pronòstic i en la resposta a l'hora d'escollir i dur a terme els tractaments. L'anàlisi de dades transcriptòmiques mitjançant RNA-Seq permetrà estudiar els nivells d'expressió gènica i identificar patrons moleculars capaços de discriminar entre aquests subtipus tumorals. Aquest tipus d’anàlisi és especialment útil en medicina de precisió, ja que facilita una millor classificció dels pacients i pot contribuir a una presa de decisions terapèutiques més adequada.
+Per poder diferenciar aquests subtipus de manera eficaç, resulta de gran utilitat l'anàlisi de dades transcriptòmiques (RNA-Seq). Estudiar els nivells d'expressió gènica permet identificar patrons moleculars capaços de discriminar entre aquests subtipus tumorals. Aquest tipus d’anàlisi és especialment útil en medicina de precisió, ja que facilita una millor classificció dels pacients i pot contribuir a una presa de decisions terapèutiques més adequada.
 
-A partir d'aquestes dades, s'aplicaran diferents algoritmes de classificació supervisada, concretament k-NN i SVM amb l'objectiu d'identificar quin model presenta un millor rendiment predictiu.
+L'objectiu principal d'aquest treball és desenvolupar i comparar models matemàtics capaços d'automatitzar aquesta classificació clínica. Per fer-ho, s'utilitzarà un subconjunt de dades proporcionades per *The Cancer Genome Atlas Network* (TCGA), corresponent a 150 mostres de tumors de mama prèviament filtrades i normalitzades. En aquesta base de dades, la primera columna ens indica el subtipus tumoral real del pacient, mentre que la resta corresponen als nivells d'expressió dels seus gens.
 
-L'objectiu principal del treball és desenvolupar i comparar diferents models de classificació supervisada per discriminar els subtipus de càncer de mama. 
+A partir d'aquesta informació, s'entrenaran dos algorismes de classificació supervisada: el k-Nearest Neighbors (k-NN) i les Màquines de Vectors de Suport (SVM). La finalitat de l'estudi és ensenyar a aquests models a relacionar l'activitat genètica amb el tipus de càncer corresponent i, finalment, determinar quin dels dos presenta un millor rendiment predictiu.
 
-# MATERIALS i MÈTODES
+# Materials i mètodes
+
+A continuació es farà una petita inspecció de les dades. També es descriuran els mètodes utilitzats en l'anàlisi.
 
 ## Anàlisi exploratori de les dades
 
+Per poder dur a terme l'anàlisi, es farà una avaluació de les dades.
+
 ```{r}
+# Lectura de dades
 bbdd <- paste(params$bbdd,".csv",sep="")
 dades <- read.csv(paste(params$mypath_in,bbdd,sep=""))
 ```
 
 ```{r}
-head(dades)
+# Submostra
+head(dades[,1:8])
+# Dimensió de la base de dades
 dim(dades)
-str(dades)
+# Categoria de les variables
+str(dades, list.len = 20)
+# Número d'observacions faltants
 sum(is.na(dades))
 ```
 
-El primer que s'ha de veure és que la taula de les dades és de dimensió 150x201, cosa que significa que la taula disposa de més variables que observacions. 
-Una altra cosa que cal observar és que la variable Y (variable que indica el subtipus de càncer de mama) és una variable de caràcters que s'haurà de passar a factor, ja que els algoritmes de classificació supervisada requereixen que la variable depenent sigui categòrica. La resta de variables, evidentment, són numèriques.
+S'observa que la taula de les dades és de dimensió 150x201. Això vol dir que la taula disposa de més gens que observacions. 
+
+S'observa també que la variable Y (subtipus de càncer de mama) és categòrica. Per poder utilitzar els algoritmes de classificació supervisada serà necessari convertir-la a factor. La resta de variables són numèriques.
 
 ```{r}
+# Transformació a variable factor
 Y_factor <- factor(dades$Y, levels=c("Basal", "Her2","LumA"))
 dadesX <- dades[,-1]
-
+# Distribució de la variable factor
 table(Y_factor)
 ```
 
-Una dada important a conèixer de les dades és quina és la distribució dels subtipus tumorals. Aquesta distribució mostra un cert desequilibri entre classes, especialment pel major nombre de mostres del subtipus LumA respecte a Her2, fet que s'haurà de tenir sempre en compte durant l'avaluació dels models de classificació.
+Per altra banda, és important conèixer és quina és la distribució dels subtipus tumorals. Hi ha un cert desequilibri entre classes, especialment pel major nombre de mostres del subtipus LumA respecte a Her2. Aquest fet s'haurà de tenir en compte durant l'avaluació dels models de classificació.
 
-Per aprofundir una mica més en l'avaluació de les dades de les quals es disposa, s'ha considerat convenient dur a terme algunes tècniques per controlar la qualitat de les dades.
+Per aprofundir una mica més en l'avaluació de les dades s'ha considerat convenient dur a terme algunes tècniques per controlar la qualitat de les dades.
 
-### Boxplots
+### Distribució de l'expressió gènica segons el subtipus tumoral
+
+Per analitzar les diferències de nivells d'expressió entre subtipus tumorals s'utilitzaran diagrames de caixa. Es farà servir una selecció aleatòria de 10 gens i 10 mostres de cada subtipus tumoral.
 
 ```{r}
 #Selecció aleatòria de subtipus mostrals
@@ -117,53 +133,54 @@ ggplot(stack(as.data.frame(dataset_LumA)), aes(x = ind, y = values)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
-Els tres boxplots mostren la distribució dels nivells d'expressió per a una selecció aleatòria de 10 gens en 10 mostres de cada subtipus tumoral. Es pot observar que tots els gens presenten valors d'expressió molt similars entre si. Això indica que les dades ja es troben en uan escala relativament homogènia.
+S'observa que tots els gens presenten valors d'expressió molt similars entre si. Això indica que les dades tenen una escala relativament homogènia.
 
-### PCA
+### Reducció de dimensionalitat i exploració de les mostres
 
-Una tècnica fonamental en l'anàlisi exploratori de les dades òmiques és fer PCA sobre totes les variables predictores. És una tècnica molt útil per reduir la dimensionalitat del conjunt de dades i permet visualitzar possibles patrons de separació entre classes. Bàsicament, és una tècnica consistent en transformar les variables originals en un conjunt reduït de components ortogonals que expliquen la major part de la variabilitat total del conjunt de dades. Aquesta tècnica permet una representació visual més senzilla i facilita la identificació de possibles agrupacions naturals entre mostres. 
+Una tècnica fonamental en l'anàlisi exploratori de les dades òmiques és fer PCA (Anàlisi de Components Principals) sobre totes les variables predictores. És un mètode molt útil per reduir la dimensionalitat del conjunt de dades i permet visualitzar possibles patrons de separació entre classes. Consisteix en transformar les variables originals en un conjunt reduït de components ortogonals que expliquen la major part de la variabilitat total del conjunt de dades. Així, permet una representació visual més senzilla i facilita la identificació de possibles agrupacions naturals entre mostres. 
 
-És important emfasitzar que el PCA que es presenta a continuació té un propòsit exclusivament exploratori. L'objectiu és visualitzar com es distribueixen les mostres en funció del seu subtipus tumoral abans de qualsevol modelització. En cap cas s'utilitzen aquests resultats per entrenar els models de classificació. Si en un futur, es volgués utilitzar PCA com a mètode de reducció de dimensionalitat, seria necessari calcular els components principals únicament amb les dades d'entrenament.
+És important emfatitzar que el PCA que es presenta a continuació té un propòsit exclusivament exploratori. L'objectiu és visualitzar com es distribueixen les mostres en funció del seu subtipus tumoral abans de qualsevol modelització. En cap cas s'utilitzen aquests resultats per entrenar els models de classificació. Si en un futur es volgués utilitzar PCA com a mètode de reducció de dimensionalitat, seria necessari calcular els components principals únicament amb les dades d'entrenament.
 
 ```{r}
 pca <- prcomp(dadesX, scale. = TRUE)
 fviz_pca_ind(pca, col.ind = Y_factor, palette = c("blue","springgreen","purple"))
 ```
 
-S'observa que hi ha diferències entre els tres subtipus en les dues primeres dimensions. Tal i com indica els eixos del gràfic, la dimensió 1 explica el 18,9% de la variabilitat i la dimensió 2 expica el 13,1% de la variabilitat. Clarament, el gràfic mostra una separació entre els subtipus tumorals. Sobretot, s'observa diferències a la dimensió 1, ja que a la dimensió 2 estan completament disperses. A l'esquerra de l'eix Y = 0, veiem el gen LumA, al centre el gen Her2 que és el gen, que a simple vista, sembla que té més dispersió. A la dreta de l'eix Y = 0, hi ha el gen Basal.
+Aquest gràfic representa les observacions a partir dels nous eixos (les dues primeres components principals). Tal com s'indica en les etiquetes, la primera dimensió explica el 18,9% de la variabilitat i la segona dimensió n'explica el 13,1%. 
 
-
+El gràfic mostra una clara separació entre subtipus tumorals. Aquesta separació, però, queda definida principalment per la primera dimensió. A esquerra de l'eix s'agrupen les mostres del subtipus LumA, al centre se situen les de l'Her2 i a la dreta es concentren les del subtipus Basal. La segona dimensió no sembla contribuir de manera tan evident a la separació d'aquests tres grups.
 
 ## Mètodes utilitzats en l'anàlisi
 
-### Algorismes de classificació supervisada
-
-Per a la classificació dels subtipus tumorals de càncer de mama, s'implementaran dos tipus d'algorismes d'aprenentatge automàtic supervisat: el k-NN (k-Nearest Neighbors) i les màquines de vectors de suport (Support Vector Machines), aquest últim amb dos kernels diferenciats. Tots tres mètodes s'entrenaran sobre un conjunt d'entrenament i posteriorment s'avaluaran sobre un conjunt de test independent, seguint l'estratègia de validació creuada de 3 nodes ($K$-Fold Cross-Validation amb $K=3$). Les dades d'entrenament es divideixen en 3 subgrups de manera iterativa; s'entrena el model amb 2 d'ells i es valida amb el restant per obtenir una estimació del rendiment més estable.
+Per a la classificació dels subtipus tumorals de càncer de mama s'implementaran dos tipus d'algorismes d'aprenentatge automàtic supervisat: el k-Nearest Neighbors (k-NN) i les màquines de vectors de suport (Support Vector Machines). Aquest últim, amb dos kernels diferenciats. Tots tres mètodes s'entrenaran sobre un conjunt d'entrenament i posteriorment s'avaluaran sobre un conjunt de test independent, seguint l'estratègia de validació creuada de 3 nodes ($K$-Fold Cross-Validation amb $K=3$). Les dades d'entrenament es divideixen en 3 subgrups de manera iterativa; s'entrena el model amb 2 d'ells i es valida amb el restant per obtenir una estimació del rendiment més estable.
 
 ### k-Nearest Neighbors (k-NN)
 
 L'algoritme k-NN és un mètode de classificació basat en l'avaluació de la proximitat de les observacions en l'espai de característiques. Donada una nova mostra, s'identifiquen els $k$ veïns més propers utilitzant una mesura de distància (en aquest cas, la distància euclidiana) i s'assigna la classe majoritària d'entre les etiquetes d'aquests veïns.  
 
-L'ajust del paràmetre $k$ determina el nivell de complexitat geomètrica de la frontera de decisió. Una configuració de $k$ massa senzilla (com $k=1$) pot induir a una situació de sobreajust (*overfitting*), on el model memoritza el soroll de fons en lloc d'aprendre el patró subjacent, provocant que la frontera es torni massa local i complexa. Per contra, un $k$ excessivament gran pot conduir a un subajust (*underfitting*) pel fet de simplificar en excés l'estructura real de les dades. L'optimització d'aquest hiperparàmetre s'executa mitjançant el procediment de validació creuada.
+L'ajust del paràmetre $k$ determina el nivell de complexitat geomètrica de la frontera de decisió. Una configuració de $k$ massa senzilla (com $k=1$) pot induir a una situació de sobreajust (overfitting), on el model memoritza el soroll de fons en lloc d'aprendre el patró subjacent, provocant que la frontera es torni massa local i complexa. Per contra, un $k$ excessivament gran pot conduir a un subajust (underfitting) pel fet de simplificar en excés l'estructura real de les dades. L'optimització d'aquest hiperparàmetre s'executa mitjançant el procediment de validació creuada.
 
 ### Support Vector Machines (SVM)
 
-Les SVM són algorismes de classificació que busquen una frontera plana (un hiperplà) de separació òptim entre classes, maximitzant el marge entre les observacions més properes a la frontera de decisió, conegudes com a *vectors de suport*. En problemes on les dades són sorolloses o no completament separables, les SVM incorporen un paràmetre de regularització $C$ que controla l'equilibri entre la maximització del marge i la minimització dels errors de classificació per garantir que el model sigui simple i generalitzi bé enfront de dades noves.  
+Les SVM són algorismes de classificació que busquen una frontera plana (un hiperplà) de separació òptim entre classes, maximitzant el marge entre les observacions més properes a la frontera de decisió, conegudes com a vectors de suport. En problemes on les dades són sorolloses o no completament separables, les SVM incorporen un paràmetre de regularització $C$ que controla l'equilibri entre la maximització del marge i la minimització dels errors de classificació per garantir que el model sigui simple i generalitzi bé enfront de dades noves.  
 
-Donat que el mètode SVM està plantejat originalment per resoldre problemes de dues classes ($K=2$), l'extensió per discriminar els tres subtipus tumorals d'aquest estudi ($K=3$) es duu a terme mitjançant l'estratègia *One-versus-All* (OVA), la qual entrena un classificador independent per a cada classe contra la resta i assigna la mostra al subtipus que assoleix el valor de predicció més alt.
+Donat que el mètode SVM està plantejat originalment per resoldre problemes de dues classes ($K=2$), l'extensió per discriminar els tres subtipus tumorals d'aquest estudi ($K=3$) es duu a terme mitjançant l'estratègia One-versus-All (OVA), la qual entrena un classificador independent per a cada classe contra la resta i assigna la mostra al subtipus que assoleix el valor de predicció més alt.
 
-Per fer front a dades no linealment separables en l'espai original, les SVM utilitzen el *kernel trick*: una transformació implícita de les dades a un espai de dimensió superior on les classes sí que són separables. En aquest treball s'han implementat dos kernels:
+Per fer front a dades no linealment separables en l'espai original, les SVM utilitzen el kernel trick: una transformació implícita de les dades a un espai de dimensió superior on les classes sí que són separables. En aquest treball s'han implementat dos kernels:
 
--    **Kernel lineal**: Cerca un hiperplà de separació directament en l'espai original. És el cas més simple i interpretable, adequat quan les classes presenten una estructura aproximadament lineal, on l'únic hiperparàmetre és el cost $C$.
+#### Kernel lineal 
 
--    **Kernel radial (RBF,** *Radial Basis Function***)**: Utilitza una funció radial per mesurar la similitud entre observacions, la qual cosa permet construir fronteres de decisió no lineals i molt flexibles. Incorpora un segon hiperparàmetre, $\gamma$, que controla l'amplada de la funció gaussiana i, per tant, la influència de cada observació en la frontera de decisió. Un $\gamma$ elevat produeix fronteres molt locals i pot provocar sobreajust, mentre que un $\gamma$ baix genera fronteres més suaus i globals.
+Cerca un hiperplà de separació directament en l'espai original. És el cas més simple i interpretable, adequat quan les classes presenten una estructura aproximadament lineal, on l'únic hiperparàmetre és el cost $C$.
 
-# PROCEDIMENT
+#### Kernel radial (RBF, Radial Basis Function)
 
-## 0. Separació train/test
+Utilitza una funció radial per mesurar la similitud entre observacions, la qual cosa permet construir fronteres de decisió no lineals i molt flexibles. Incorpora un segon hiperparàmetre, $\gamma$, que controla l'amplada de la funció gaussiana i, per tant, la influència de cada observació en la frontera de decisió. Un $\gamma$ elevat produeix fronteres molt locals i pot provocar sobreajust, mentre que un $\gamma$ baix genera fronteres més suaus i globals.
 
-Per garantir la comparabilitat entre models, tots els algoritmes s'entrenen i s'avaluen emprant exactament la mateixa partició de train i test. D'acord amb les indicacions de l'enunciat, s'utilitza una llavor fixa per garantir la reproductibilitat dels resultats. 
+# Procediment
 
+## Separació en conjunts d'entrenament i de prova
+
+Per garantir la comparabilitat entre models, tots els algoritmes s'entrenen i s'avaluen emprant exactament la mateixa partició d'entrenament i prova. D'acord amb les indicacions de l'enunciat, s'utilitza una llavor fixa per garantir la reproductibilitat dels resultats. 
 
 ```{r}
 set.seed(params$seed)
@@ -180,44 +197,47 @@ dim(xtest)
 
 
 ytrain <- Y_factor[training]
-ytest<- Y_factor[-training]
+ytest <- Y_factor[-training]
 
-mydata<-data.frame(ytrain,xtrain)
+mydata <- data.frame(ytrain,xtrain)
 ```
 
 
-Per evitar que l'algoritme memoritzi les dades i crei un sobreajust, es farà servir cross-validation de 3 folds. Això vol dir que les dades estaran dividides en 3 parts diferents (*tal i com es pot observar en el chunk anterior*): 2 les farem servir per a entrenar el model i següdament amb la tercera part de les dades es valida. Es repetirà el procés  per assegurar que el model serà robust davant de dades noves. 
+Per evitar que l'algorisme memoritzi la mostra i crei un sobreajust, es farà servir cross-validation de 3 folds. Això vol dir que les dades estaran dividides en 3 parts diferents: dos terços es faran servir per a entrenar el model i el terç restant per validar-lo. Es repetirà el procés per assegurar que el model serà robust davant de noves observacions. 
 
+## Classificació multiclasse: Detecció dels tres subtipus tumorals
 
-## 1. Classificació amb k-Nearest Neighbours
+En aquest apartat s'entrenaran els algorismes utilitzant totes les mostres disponibles. L'objectiu és que els models aprenguin a distingir simultàniament entre els tres subtipus (Basal, Her2 i LumA) a partir del seu perfil genètic.
+
+### Classificació amb k-Nearest Neighbours
 
 El mètode de **K-Nearest Neighbour (KNN)** consisteix en crear una nova mostra (desconeguda) per observar la classe pertinent de les mostres veïnes; és a dir, aquelles que són més properes a ella en l'espai de dades. 
 
-Amb la següent funció s'aplica aquest mètode, es calcula la distància euclidiana (*que és la típica en aquest cas*) d'un punt cap als seus "k" veïns més propers a partir dels nivells d'expressió dels gens (que actuen en aquest cas com variables predictores). Finalment, s'assigna la classe majoritària entre els k veïns a la nova mostra.  
-
+Amb la següent funció s'aplica aquest mètode, es calcula la distància euclidiana d'un punt cap als seus "k" veïns més propers a partir dels nivells d'expressió dels gens (que actuen en aquest cas com variables predictores). Finalment, s'assigna la classe majoritària entre els k veïns a la nova mostra.
 
 Tal com s'ha explicat anteriorment, es fa servir el cross-validation de 3 folds. S'exploren els valors k = 1, 3, 5, 7, 11 per trobar el nombre òptim de veïns per aquest conjunt de dades.  
  
 ```{r}
-# mètode d'entrenament del 3-fold cv (validació creuada)
+# Mètode d'entrenament del 3-fold cv (validació creuada)
 ctrl <- trainControl(method = "cv", number = 3)
-
 valors_k <- expand.grid(k = c(1, 3, 5, 7, 11))
 ```
 
 Ara s'entrena el model KNN usant la variable Y com a resposta i tota la resta com a predictors. S' estandaritzen les dades perquè KNN es basa en distàncies i es sap que és molt sensible a l'escala de les pròpies dades per a calcular-les.  
 
 ```{r}
+# Llavor
 set.seed(params$seed)
+# Aplicació del model
 model_knn <- train(ytrain ~ ., 
                    data = mydata, 
                    method = "knn", 
                    trControl = ctrl, 
                    tuneGrid = valors_k,
                    preProcess = c("center", "scale"))
-
 print(model_knn)
 ```
+
 En els resultats obtinguts en aquesta taula s'observa que s'han utilitzat 100 mostres per a l'entrenament (són el 2/3 de les 150 que hi ha) juntament amb els 200 predictors que hi ha (nivells d'expressió dels gens).
 
 Aquesta explica que els grups de validació (3 fold) han tingut mides de 67, 67 i 66 mostres.
@@ -229,23 +249,27 @@ S'observa que la màxima precisió (accuracy = 0.8897802) s'assoleix de manera i
 Es realitza la representació gràfica de la validació d'aquest mètode: 
 
 ```{r}
+# Representació gràfica
 plot(model_knn, main = "Optimització de K", 
      pch = 19, col = "steelblue")
 ```
+
+
 Com es pot observar, k=1 i k=3 tenen la mateixa precisió. Aquest fet ja era observable en l'output del model. 
 
 
-## 2. Classificació amb Support Vector Machine
+### Classificació amb Support Vector Machine
 
 Primer de tot s'indica que es vol entrenar el model amb 3 fold-cross validation, això es fa indicant als paràmetres el mètode "cv" (cross-validation) i com que es volen 3 folds, number 3. Amb els folds el que es consegueix és dividir les dades en 3 parts iguals on es fan tres iteracions. S'entrena amb dos folds i es valida amb el que resta. Amb aquest mètode s'utilitzen millor les dades ja que, com que es tenen molts gens en el data-set no es pot permetre perdre dades.
 
 ```{r}
+# Mètode d'entrenament del 3-fold cv (validació creuada)
 control <- trainControl(method = "cv", number = 3)
 ```
 
 Un cop definit la manera d'entrenar el model, s'aplica aquest, es començarà a aplicar el SVM, aquest algorisme busca separar classes amb un hiperplà óptim, en el cas d'aquest treball, es busca distingir els diferents tipus de mostres biològiques.
 
-Lo bo d'aquest algorsime és que segueix sent efectiu en els casos on p>n.
+Lo bo d'aquest algorisme és que segueix sent efectiu en els casos on p>n.
 
 Com que l’objectiu d’aquest algorisme és separar les classes mitjançant una frontera de decisió lineal, en el cas de dades en més de dues dimensions, com aquest treball en particular on es té `ncol(dades)=201`, el conjunt té 200 predictors, ja que la columna Y és la variable resposta i no compta com a predictor, i per tant aquesta frontera será un hiperplà. Aquesta frontera possiblement no será lineal i per això s'usen les funcions kernel, que permeten transformar les dades a un espai de major dimensió on poden ser separades linealment.
 
@@ -256,12 +280,15 @@ En primer lloc, s’explora el kernel lineal, que no aplica cap transformació i
 S'entrena el model amb la formula del model, utilitzant totes les variables, s'utilitzen les dades que han sigut expressament separades per entrenar el model amb el tractament de control `trControl` establert abans (3 fold-cross validation). S'aplica `svmLinear`, que és la funció kernel, com s'ha comentat anteriorment. És important escalar les variables en l'algorisme SVM, i per tant es fa un preprocessament `preProcess` on es centren i s'escalen. I finalment, es defineixen els valors dels paràmetres de l'hiperplà `tuneGrid=expand.grid()` on es van provant diferents valors fins trobar l'adequat.
 
 ```{r}
+# Llavor
 set.seed(params$seed)
-
+# Aplicació del model
 modelo_svm_lineal <- train(ytrain ~ ., data = mydata, method = "svmLinear", trControl = control, preProcess = c("center", "scale"), tuneGrid = expand.grid(C = 2^(-5:10)))
 modelo_svm_lineal
 plot(modelo_svm_lineal, xlim=c(-10,100))
 ```
+
+
 S'observa que per quasi bé tots els valors de C tenen la Accuracy amb el mateix valor i com que aquest és proper a 1 indica que es té un model molt estable i fàcilment separable linealment. També s'observa un coeficient Kappa alt el qual desconta l'atzar i per tant es confirma que és un bon model. Finalment es mostra que el valor ideal de C és 0.03125, el qual és el més petit, ja que s'aplica el principi de parsimònia que és que el model simple ja funciona perfectament.
 
 Amb el gráfic es recolzen les conclusions obtenides abans, un Accuracy del 92.29% i un coeficient Kappa del 0.8798438 i es mostra que els diferents valors de C tenen el mateix valor d'Accuracy i Kappa. S'escull un valor petit de C perquè impliquen una major regularització i un evita el sobreajust.
@@ -275,23 +302,19 @@ En conclusió, el model amb la funció kernel lineal està molt ben ajustat, igu
 De forma similar al lineal, s'usen totes les variables regressores, s'utilitzen les dades separades per entrenar amb el tractament especificat al principi, s'escalen les dades com a preprocessament. El que canvia en aquest model és el mètode `svmRadial` i que en aquest es tenen dos paràmetres a ajustar, aquests són el `C` (que també estava en el model lineal) que és quant castigues equivocar-se, i `Sigma` que signfica com de recargolada pot ser la frontera que es crea. Per establir aquests paràmetres es fa una graella i prova amb els diferents.
 
 ```{r}
+# Llavor
 set.seed(params$seed)
-
+# Aplicació del model
 grid_rbf <- expand.grid(C = 2^(-5:10), sigma = 2^(-10:1))
-
 modelo_svm_rbf <- train(ytrain ~ ., data = mydata, method = "svmRadial", trControl = control, preProcess = c("center", "scale"), tuneGrid = grid_rbf)
-
 modelo_svm_rbf
-
-plot(modelo_svm_rbf)
 ```
-A partir dels resultats del model mostra que, moltes combinacions de C i sigma donen una accuracy propera a 0.54 i un Kappa igual a 0, indicant que el model és molt sensible a aquests paràmetres. Els quals són valors molt més petits que el lineal. Però es troba que la millor combinació és sigma 0.0009765625 i C=2 on s'obté un 93.97% d'accuracy i un Kappa de 0.894, que és un rendiment molt alt.
+
+
+En els resultats del model s'observa que moltes combinacions de C i sigma donen una accuracy propera a 0.54 i un Kappa igual a 0, indicant que el model és molt sensible a aquests paràmetres. Els quals són valors molt més petits que el lineal. Però es troba que la millor combinació és sigma 0.0009765625 i C=2 on s'obté un 93.97% d'accuracy i un Kappa de 0.894, que és un rendiment molt alt.
 
 Amb el gráfic el es comparen els diferents valors de C amb els diferents valors de sigma i s'observa que una sigma petita, proper a 0, té un Accuracy més alt.
 
-
-
-# RESULTATS
 
 ### Matriu de confusió i metriques de qualitat
 
@@ -420,34 +443,21 @@ kable(taula3, caption = "Mètriques d'Avaluació Detallades i Comparatives per S
 -    **SVM Radial**: S'obté una sensibilitat del $100\%$ tant per la classe `Basal` com a `LumA`. D'altra banda, el valor predictiu positiu (*PPV*) arriba al $100\%$ en els subtipus `Basal` i `Her2`, de manera que el model predictiu sempre encerta. A més, la detecció de les mostres `Her2` augmenta fins al $80\%$. Així mateix, manté una especificitat del $100\%$ per a `Basal` i `Her2`. Per a la classe `LumA`, es té una especificitat del $89.66\%$, indicant que els únics errors del model són 3 mostres reals `Her2` classificades com a `LumA`, situant el seu *PPV* en un $0.8750$. En resum, és el model més robust i fiable, amb l'únic punt feble en la sensibilitat de `Her2`.
 
 
-### Corba ROC i l’àrea sota la corba (AUC)
+## Classificació binària: Discriminació entre els subtipus Basal i Her2
 
-En aquest punt s'ajusten els classificadors utilitzats en els apartats anteriors per discriminar entre les classes Basal i Her2. Després, s'obtenen les corbes ROC i les magnituds AUC de cada model en el conjunt test.
+Per tal d'avaluar el rendiment predictiu en un entorn més acotat, en aquest apartat s'exclouen les mostres de la classe LumA. D'aquesta manera, el problema se simplifica i obliga als models a discriminar exclusivament entre els pacients amb tumors Basal i Her2. 
 
-La corba ROC (Receiver Operating Characteristic) representa la taxa de veritables positius (càncers Basal que s'han detectat correctament) en l'eix Y i la taxa de falsos positius (càncers Her2 que s'han detectat erròniament com a Basal) en l'eix X, les dues en funció dels diferents llindars. Els seus punts crítics són els següents:
+### Execució dels models
 
-* `(0, 0)`: Representa l'estratègia consistent en classificar tots els casos com a Basal.
-
-* `(0, 1)`: Representa l'estratègia òptima. En aquest punt, no ens equivocaríem en cap diagnòstic.
-
-* `(1, 1)`: Representa l'estratègia consistent en classificar tots els casos com a Her2.
-
-Per poder comparar classificadors, es redueix el rendiment de la corba ROC a un únic escalar. Per fer-ho, s'acostuma a utilitzar l'AUC (Area Under the Curve), que representa l'àrea sota la corba. Aquest valor té una propietat matemàtica important: és l'equivalent a dur a terme el test dels rangs signats de Wilcoxon. Així, el seu valor també es pot interpretar com la probabilitat que el model hagi donat una puntuació més alta a un càncer Basal que a un càncer Her2.
-
-Perquè un model sigui millor que l'atzar, s'ha de situar per sobre de la diagonal traçada des de (0, 0) a (1, 1). Dit d'una altra manera, ha de tenir un AUC superior a 0,5.
-
-Per poder comparar els apartats es procedirà de la següent manera:
+Es procedirà de la següent manera:
 
 1.  Emmagatzematge dels paràmetres òptims dels models utilitzats amb anterioritat.
 
 2.  Eliminació de les observacions de la classe LumA de les bases de dades que es faran servir.
 
-3.  Execució dels models amb parametrització òptima. Creació i interpretació de les matrius de confusió.
+3.  Execució dels models amb parametrització òptima. 
 
-4.  Càlcul de la corba ROC i la magnitud AUC de cada model.
-
-5.  Valoració dels resultats.
-
+4.  Creació i interpretació de les matrius de confusió.
 
 ```{r}
 # Emmagatzematge dels paràmetres òptims dels models utilitzats amb anterioritat.
@@ -496,6 +506,23 @@ S'observa el següent:
 
 -   El model SVM radial té una precisió del 100%. És a dir, que ha classificat totes les observacions del conjunt de prova correctament.
 
+Per poder comparar els models es farà servir la corba ROC i l'AUC.
+
+
+### Corba ROC i l’àrea sota la corba (AUC)
+
+La corba ROC (Receiver Operating Characteristic) representa la taxa de veritables positius (càncers Basal que s'han detectat correctament) en l'eix Y i la taxa de falsos positius (càncers Her2 que s'han detectat erròniament com a Basal) en l'eix X, les dues en funció dels diferents llindars. Els seus punts crítics són els següents:
+
+* `(0, 0)`: Representa l'estratègia consistent en classificar tots els casos com a Her2.
+
+* `(0, 1)`: Representa l'estratègia òptima. En aquest punt, no ens equivocaríem en cap diagnòstic.
+
+* `(1, 1)`: Representa l'estratègia consistent en classificar tots els casos com a Basal.
+
+Per poder comparar classificadors, es redueix el rendiment de la corba ROC a un únic escalar. Per fer-ho, s'acostuma a utilitzar l'AUC (Area Under the Curve), que representa l'àrea sota la corba. Aquest valor té una propietat matemàtica important: és l'equivalent a dur a terme el test dels rangs signats de Wilcoxon. Així, el seu valor també es pot interpretar com la probabilitat que el model hagi donat una puntuació més alta a un càncer Basal que a un càncer Her2.
+
+Perquè un model sigui millor que l'atzar, s'ha de situar per sobre de la diagonal traçada des de (0, 0) a (1, 1). Dit d'una altra manera, ha de tenir un AUC superior a 0,5.
+
 
 ```{r}
 # Càlcul de la corba ROC i la magnitud AUC de cada model.
@@ -538,25 +565,16 @@ S'observa el següent:
 Així, per criteri de Parsimònia (per rendiments similars, millor triar el model més simple) el millor algorisme és el SVM lineal.
 
 
-# DISCUSSIÓ 
+# Conclusions
 
-Pel que fa al k-NN, s'ha determinat que el paràmetre k=3 és l'òptim, ja que maximitza la capacitat predictiva evitant problemes de sobreajust.
+A partir de l'anàlisi i l'avaluació dels models d'aprenentatge automàtic aplicats, s'extreuen les conclusions següents:
 
-En comparar els mètodes, el SVM amb kernel lineal ha resultat ser clarament superior, superant el k-NN i el SVM radial. L'absència de millora amb el model radial demostra que, en 'espai d'alta dimensió, els patrons d'expressió ja són perfectament separables de forma lineal.
+1.  L'SVM Radial és el model òptim per a la discriminació de tres classes: aconsegueix la precisió i exactitud més altes.
 
-Finalment, a nivell biològic, tots els models classifiquen perfectament el subtipus LumA, però presenten lleugeres confusions entre Her2 i Basal. Això suggereix que aquests dos darrers comparteixen més semblances transcripcionals, reflectint la complexitat i heterogeneïtat del càncer de mama.
+2.  Dificultat per diferenciar els subtipus Her2 i LumA: En la classificació multiclasse, les matrius de confusió reflecteixen que la majoria dels errors dels models, especialment el k-NN i l'SVM Lineal, apareixen al classificar erròniament mostres d'Her2 com a LumA.
+
+3.  L'SVM Lineal és el model òptim per discriminar entre les classes Basal i Her2: En el cas de la classificació binària, l'algorisme SVM Lineal aconsegueix un rendiment excel·lent (amb un AUC d'1, igualant el de l'SVM Radial). Aplicant el principi de parsimònia, s'escull aquest model perquè aconsegueix una separació perfecta de les dades de manera molt més senzilla, evitant el sobreajust innecessari.
 
 
+# 5 Bibliografia
 
-# REFERÈNCIES
-
-- Wikipedia STC2
-- Wikipedia APOD
-- https://portal.gdc.cancer.gov/genes/ENSG00000074527
-- https://sebbm.es/revista/investigacion/mex3a-una-proteina-necesaria-para-mantener-el-reservorio-de-celulas-madre/
-- https://www.ncbi.nlm.nih.gov/gene/10512 
-- https://scikit-learn.org/stable/modules/svm.html#kernel-functions
-- https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.GridSearchCV.html#sklearn.model_selection.GridSearchCV
-- https://rpubs.com/joser/caret
-
-- https://www.ncbi.nlm.nih.gov/gene/10512 
